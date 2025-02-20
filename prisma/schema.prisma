@@ -1,0 +1,27 @@
+// prisma/schema.prisma
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL") // Set this in .env file
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Farmer {
+  id           Int     @id @default(autoincrement())
+  name         String
+  farmLocation String
+  contact      String?
+  products     Product[]
+}
+
+model Product {
+  id          Int     @id @default(autoincrement())
+  name        String
+  category    String
+  price       Float
+  farmerId    Int
+  farmer      Farmer  @relation(fields: [farmerId], references: [id])
+}
