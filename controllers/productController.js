@@ -1,26 +1,26 @@
-// controllers/productController.js
-const Product = require('../models/product');
+const prisma = require('../utils/prismaClient');
 
+// Get all products
 const getAllProducts = async (req, res) => {
   try {
-    const products = await Product.getAllProducts();
+    const products = await prisma.product.findMany();
     res.status(200).json(products);
-  } catch (err) {
-    res.status(500).json({ error: 'Error fetching products' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 };
 
-const createProduct = async (req, res) => {
-  const { name, category, price } = req.body;
+// Add a new product
+const addProduct = async (req, res) => {
+  const { name, description, price, category } = req.body;
   try {
-    const newProduct = await Product.createProduct({ name, category, price });
-    res.status(201).json(newProduct);
-  } catch (err) {
-    res.status(500).json({ error: 'Error creating product' });
+    const product = await prisma.product.create({
+      data: { name, description, price, category },
+    });
+    res.status(201).json({ message: 'Product added successfully!', product });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
   }
 };
 
-module.exports = {
-  getAllProducts,
-  createProduct,
-};
+module.exports = { getAllProducts, addProduct };

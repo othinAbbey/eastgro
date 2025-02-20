@@ -1,8 +1,6 @@
-// prisma/schema.prisma
-
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL") // Set this in .env file
+  url      = env("DATABASE_URL") 
 }
 
 generator client {
@@ -10,18 +8,34 @@ generator client {
 }
 
 model Farmer {
-  id           Int     @id @default(autoincrement())
-  name         String
-  farmLocation String
-  contact      String?
-  products     Product[]
+  id            Int      @id @default(autoincrement())
+  name          String
+  email         String   @unique
+  phone         String
+  farm_location String
+  farm_type     String
+  reports       Report[] // 👈 Add this back-relation field
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 model Product {
-  id          Int     @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   name        String
-  category    String
+  description String
   price       Float
-  farmerId    Int
-  farmer      Farmer  @relation(fields: [farmerId], references: [id])
+  category    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Report {
+  id           Int      @id @default(autoincrement())
+  problem_type String
+  description  String
+  urgency      String
+  farmerId     Int?
+  farmer       Farmer?  @relation(fields: [farmerId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }

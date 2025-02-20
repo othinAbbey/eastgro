@@ -1,11 +1,12 @@
-// routes/farmerRoutes.js
 const express = require('express');
-const { getAllFarmers, getFarmerById, createFarmer } = require('../controllers/farmerController');
+const { registerFarmer, getAllFarmers } = require('../controllers/farmerController');
 
 const router = express.Router();
 
+// Register a new farmer
+router.post('/register', registerFarmer);
+
+// Get all farmers
 router.get('/', getAllFarmers);
-router.get('/:id', getFarmerById);
-router.post('/', createFarmer);
 
 module.exports = router;
