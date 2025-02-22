@@ -1,12 +1,39 @@
-const express = require('express');
-const { registerFarmer, getAllFarmers } = require('../controllers/farmerController');
+// const express = require('express');
+// const { registerFarmer, getAllFarmers } = require('../controllers/farmerController');
 
+// const router = express.Router();
+
+// // Register a new farmer
+// router.post('/register', registerFarmer);
+
+// // Get all farmers
+// router.get('/', getAllFarmers);
+
+// module.exports = router;
+
+
+// import express from 'express';
+// import { createFarmer, getFarmers } from '../controllers/farmerController.js';
+// const router = express.Router();
+
+// router.post('/', createFarmer);
+// router.get('/', getFarmers);
+
+// export default router;
+
+
+import express from 'express';
+import farmerController from '../controllers/farmerController.js';
+import roleMiddleware from '../middleware/roleMiddleware.js';
 const router = express.Router();
 
-// Register a new farmer
-router.post('/register', registerFarmer);
+// Create a new farmer (admin or authorized role)
+router.post('/', farmerController.createFarmer);
 
-// Get all farmers
-router.get('/', getAllFarmers);
+// Get farmer details by ID (only the farmer or authorized roles can access)
+router.get('/:id', roleMiddleware(['farmer']), farmerController.getFarmerById);
+
+// Update farmer details
+router.put('/:id', roleMiddleware(['farmer']), farmerController.updateFarmer);
 
 module.exports = router;

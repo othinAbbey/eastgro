@@ -1,41 +1,104 @@
+// Enum for different produce statuses
+enum ProduceStatus {
+  HARVESTED
+  IN_TRANSIT
+  PROCESSED
+  DELIVERED
+}
+
+// Enum for different shipment statuses
+enum ShipmentStatus {
+  PENDING
+  IN_TRANSIT
+  DELIVERED
+  RETURNED
+}
+
+// Enum for quality grades
+enum QualityGrade {
+  A
+  B
+  C
+  D
+  FAILED
+}
+
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL") 
+  url      = env("DATABASE_URL")
 }
 
 generator client {
   provider = "prisma-client-js"
 }
 
-model Farmer {
-  id            Int      @id @default(autoincrement())
+
+
+model Produce {
+  id            String        @id @default(uuid())
+  farmerId      String
+  farmer        Farmer        @relation(fields: [farmerId], references: [id])
+  type          String
+  quantity      Int
+  harvestDate   DateTime
+  qualityReport QualityGrade?
+  shipments     Shipment[]
+  qrCode        QRCode?
+  status        ProduceStatus @default(HARVESTED) // Default to HARVESTED
+}
+
+model Transporter {
+  id            String   @id @default(uuid())
   name          String
-  email         String   @unique
-  phone         String
-  farm_location String
-  farm_type     String
-  reports       Report[] // 👈 Add this back-relation field
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  vehicleDetails String?
+  contact       String
+  shipments     Shipment[]
 }
 
-model Product {
-  id          Int      @id @default(autoincrement())
+model Facility {
+  id               String   @id @default(uuid())
+  name             String
+  location         String
+  processingDetails String?
+  shipments        Shipment[]
+}
+
+model Shipment {
+  id            String       @id @default(uuid())
+  produceId     String
+  produce       Produce      @relation(fields: [produceId], references: [id])
+  transporterId String?
+  transporter   Transporter? @relation(fields: [transporterId], references: [id])
+  facilityId    String?
+  facility      Facility?    @relation(fields: [facilityId], references: [id])
+  destination   String
+  status        ShipmentStatus @default(PENDING) // Default to PENDING
+  deliveryDate  DateTime?
+}
+
+model Farmer {
+  id          String   @id @default(uuid())
   name        String
-  description String
-  price       Float
-  category    String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  contact     String
+  location    String
+  farmDetails String?
+  role        String   @default("farmer") // Add role field
+  produce     Produce[]
 }
 
-model Report {
-  id           Int      @id @default(autoincrement())
-  problem_type String
-  description  String
-  urgency      String
-  farmerId     Int?
-  farmer       Farmer?  @relation(fields: [farmerId], references: [id])
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+model Customer {
+  id               String   @id @default(uuid())
+  name             String
+  contact          String
+  purchaseHistory  String?
+  role             String   @default("customer") // Add role field
+}
+
+
+model QRCode {
+  id         String   @id @default(uuid())
+  produceId  String   @unique
+  produce    Produce  @relation(fields: [produceId], references: [id])
+  generatedAt DateTime @default(now())
+  scannedAt   DateTime?
 }

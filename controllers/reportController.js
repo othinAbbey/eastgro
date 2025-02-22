@@ -1,4 +1,5 @@
-const prisma = require('../utils/prismaClient');
+import { PrismaClient } from '@prisma/client';
+const prisma = new PrismaClient();
 
 // Submit a report
 const submitReport = async (req, res) => {
@@ -23,4 +24,4 @@ const getAllReports = async (req, res) => {
   }
 };
 
-module.exports = { submitReport, getAllReports };
+export { submitReport, getAllReports };
