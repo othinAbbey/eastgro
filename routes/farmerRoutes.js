@@ -28,12 +28,12 @@ import roleMiddleware from '../middleware/roleMiddleware.js';
 const router = express.Router();
 
 // Create a new farmer (admin or authorized role)
-router.post('/', farmerController.createFarmer);
+router.post('/register', farmerController.createFarmer);
 
 // Get farmer details by ID (only the farmer or authorized roles can access)
-router.get('/:id', roleMiddleware(['farmer']), farmerController.getFarmerById);
+router.get('/farmer/:id', roleMiddleware(['farmer']), farmerController.getFarmerById);
 
 // Update farmer details
-router.put('/:id', roleMiddleware(['farmer']), farmerController.updateFarmer);
+router.put('farmer/:id', roleMiddleware(['farmer']), farmerController.updateFarmer);
 
-module.exports = router;
+export default router;

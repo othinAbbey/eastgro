@@ -23,12 +23,12 @@ import roleMiddleware from '../middleware/roleMiddleware.js';
 import customerController from '../controllers/customerController.js';
 const router = express.Router();
 // Create a new customer
-router.post('/', customerController.createCustomer);
+router.post('/register', customerController.createCustomer);
 
 // Get customer details by ID (only the customer or authorized roles can access)
-router.get('/:id', roleMiddleware(['customer']), customerController.getCustomerById);
+router.get('/customer/:id', roleMiddleware(['customer']), customerController.getCustomerById);
 
 // Update customer details
-router.put('/:id', roleMiddleware(['customer']), customerController.updateCustomer);
+router.put('/customer:id', roleMiddleware(['customer']), customerController.updateCustomer);
 
-module.exports = router;
+export default router;

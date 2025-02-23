@@ -1,95 +1,27 @@
-// import { PrismaClient } from '@prisma/client';
-// const prisma = new PrismaClient();
+import dotenv from 'dotenv';
+dotenv.config();
+import { PrismaClient } from '@prisma/client';
+const prisma = new PrismaClient();
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
 
-
-// // Add a new customer
-// const addCustomer = async (req, res) => {
-//   const { name, contact, purchaseHistory } = req.body;
-
-//   try {
-//     const newCustomer = await Prisma.customer.create({
-//       data: {
-//         name,
-//         contact,
-//         purchaseHistory,
-//       },
-//     });
-//     res.status(201).json({ customer: newCustomer });
-//   } catch (error) {
-//     console.error(error);
-//     res.status(500).json({ error: 'Failed to add customer' });
-//   }
-// };
-
-// // Get customer details by ID
-// const getCustomerById = async (req, res) => {
-//   const { id } = req.params;
-
-//   try {
-//     const customer = await prisma.customer.findUnique({
-//       where: { id },
-//     });
-
-//     if (!customer) {
-//       return res.status(404).json({ error: 'Customer not found' });
-//     }
-
-//     res.json(customer);
-//   } catch (error) {
-//     console.error(error);
-//     res.status(500).json({ error: 'Failed to retrieve customer' });
-//   }
-// };
-
-// // Update customer details
-// const updateCustomer = async (req, res) => {
-//   const { id } = req.params;
-//   const { name, contact, purchaseHistory } = req.body;
-
-//   try {
-//     const updatedCustomer = await prisma.customer.update({
-//       where: { id },
-//       data: {
-//         name,
-//         contact,
-//         purchaseHistory,
-//       },
-//     });
-
-//     res.json({ customer: updatedCustomer });
-//   } catch (error) {
-//     console.error(error);
-//     res.status(500).json({ error: 'Failed to update customer' });
-//   }
-// };
-
-// // Delete a customer
-// const deleteCustomer = async (req, res) => {
-//   const { id } = req.params;
-
-//   try {
-//     const deletedCustomer = await prisma.customer.delete({
-//       where: { id },
-//     });
-
-//     res.json({ message: 'Customer deleted successfully' });
-//   } catch (error) {
-//     console.error(error);
-//     res.status(500).json({ error: 'Failed to delete customer' });
-//   }
-// };
-
-// export { addCustomer, getCustomerById, updateCustomer, deleteCustomer };
-
-const prisma = require('../prismaClient');
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
-
-createCustomer = async (req, res) => {
+const createCustomer = async (req, res) => {
   const { name, contact, password, purchaseHistory } = req.body;
-  
+
   try {
+    // Check if the customer already exists
+    const existingCustomer = await prisma.customer.findUnique({
+      where: { contact },
+    });
+
+    if (existingCustomer) {
+      return res.status(400).json({ message: 'Customer with this contact already exists' });
+    }
+
+    // Hash the password before saving
     const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create the customer record
     const customer = await prisma.customer.create({
       data: {
         name,
@@ -99,29 +31,40 @@ createCustomer = async (req, res) => {
         role: 'customer',
       },
     });
-    
+
+    // Generate JWT for the newly created customer
     const token = jwt.sign({ id: customer.id, role: 'customer' }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    res.status(201).json({ token });
+
+    // Send token and customer data in the response
+    res.status(201).json({
+      message: 'Customer created successfully',
+      token, // JWT token
+      customer: { id: customer.id, name: customer.name, contact: customer.contact, purchaseHistory: customer.purchaseHistory },
+    });
   } catch (err) {
-    res.status(400).send('Error creating customer');
+    console.error('Error details:', err); // Log the full error for debugging
+    res.status(500).send('Error creating customer');
   }
 };
 
-getCustomerById = async (req, res) => {
+const getCustomerById = async (req, res) => {
   try {
     const customer = await prisma.customer.findUnique({
       where: { id: req.params.id },
     });
-    
-    if (!customer) return res.status(404).send('Customer not found');
-    
+
+    if (!customer) {
+      return res.status(404).send('Customer not found');
+    }
+
     res.status(200).json(customer);
   } catch (err) {
+    console.error('Error details:', err); // Log error for debugging
     res.status(500).send('Error fetching customer data');
   }
 };
 
-updateCustomer = async (req, res) => {
+const updateCustomer = async (req, res) => {
   const { name, contact, purchaseHistory } = req.body;
 
   try {
@@ -130,9 +73,14 @@ updateCustomer = async (req, res) => {
       data: { name, contact, purchaseHistory },
     });
 
-    res.status(200).json(updatedCustomer);
+    res.status(200).json({
+      message: 'Customer updated successfully',
+      updatedCustomer,
+    });
   } catch (err) {
+    console.error('Error details:', err); // Log error for debugging
     res.status(400).send('Error updating customer');
   }
 };
-export { createCustomer, getCustomerById, updateCustomer };
+
+export default { createCustomer, getCustomerById, updateCustomer };

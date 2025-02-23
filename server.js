@@ -29,6 +29,7 @@ import facilityRoutes from './routes/facilityRoutes.js';
 import shipmentRoutes from './routes/shipmentRoutes.js';
 import customerRoutes from './routes/customerRoutes.js';
 import qrCodeRoutes from './routes/qrCodeRoutes.js';
+import authRoutes from './routes/authRoutes.js';
 
 dotenv.config();
 

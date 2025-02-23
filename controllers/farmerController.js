@@ -1,65 +1,27 @@
-// const prisma = require('../utils/prismaClient');
-
-// // Register a new farmer
-// const registerFarmer = async (req, res) => {
-//   const { name, email, phone, farm_location, farm_type } = req.body;
-//   try {
-//     const farmer = await prisma.farmer.create({
-//       data: { name, email, phone, farm_location, farm_type },
-//     });
-//     res.status(201).json({ message: 'Farmer registered successfully!', farmer });
-//   } catch (error) {
-//     res.status(400).json({ error: error.message });
-//   }
-// };
-
-// // Get all farmers
-// const getAllFarmers = async (req, res) => {
-//   try {
-//     const farmers = await prisma.farmer.findMany();
-//     res.status(200).json(farmers);
-//   } catch (error) {
-//     res.status(500).json({ error: error.message });
-//   }
-// };
-
-// module.exports = { registerFarmer, getAllFarmers };
-
-// import { PrismaClient } from '@prisma/client';
-// const prisma = new PrismaClient();
-
-// const createFarmer = async (req, res) => {
-//   try {
-//     const { name, contact, location, farmDetails } = req.body;
-//     const farmer = await prisma.farmer.create({
-//       data: { name, contact, location, farmDetails },
-//     });
-//     res.json(farmer);
-//   } catch (error) {
-//     res.status(500).json({ error: error.message });
-//   }
-// };
-
-// const getFarmers = async (req, res) => {
-//   try {
-//     const farmers = await prisma.farmer.findMany();
-//     res.json(farmers);
-//   } catch (error) {
-//     res.status(500).json({ error: error.message });
-//   }
-// };
-
-// export { createFarmer, getFarmers };
-
-const prisma = require('../prismaClient');
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
+import dotenv from 'dotenv';
+dotenv.config();
+import { PrismaClient } from '@prisma/client';
+const prisma = new PrismaClient();
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
 
 const createFarmer = async (req, res) => {
-  const { name, contact, password, farmDetails } = req.body;
+  const { name, contact, password, farmDetails, location } = req.body;
   
   try {
+    // Check if the farmer already exists
+    const existingFarmer = await prisma.farmer.findUnique({
+      where: { contact },
+    });
+    
+    if (existingFarmer) {
+      return res.status(400).json({ message: 'Farmer with this contact already exists' });
+    }
+
+    // Hash the password before saving
     const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create the farmer record
     const farmer = await prisma.farmer.create({
       data: {
         name,
@@ -67,13 +29,22 @@ const createFarmer = async (req, res) => {
         password: hashedPassword,
         farmDetails,
         role: 'farmer',
+        location,
       },
     });
     
+    // Generate JWT for the newly created farmer
     const token = jwt.sign({ id: farmer.id, role: 'farmer' }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    res.status(201).json({ token });
+
+    // Send token and farmer data in the response
+    res.status(201).json({
+      message: 'Farmer created successfully',
+      token, // JWT token
+      farmer: { id: farmer.id, name: farmer.name, contact: farmer.contact, farmDetails: farmer.farmDetails, location: farmer.location }
+    });
   } catch (err) {
-    res.status(400).send('Error creating farmer');
+    console.error('Error details:', err); // Log the full error for debugging
+    res.status(500).send('Error creating farmer');
   }
 };
 
@@ -82,27 +53,35 @@ const getFarmerById = async (req, res) => {
     const farmer = await prisma.farmer.findUnique({
       where: { id: req.params.id },
     });
-    
-    if (!farmer) return res.status(404).send('Farmer not found');
-    
+
+    if (!farmer) {
+      return res.status(404).send('Farmer not found');
+    }
+
     res.status(200).json(farmer);
   } catch (err) {
+    console.error('Error details:', err); // Log error for debugging
     res.status(500).send('Error fetching farmer data');
   }
 };
 
 const updateFarmer = async (req, res) => {
-  const { name, contact, farmDetails } = req.body;
+  const { name, contact, farmDetails, location } = req.body;
 
   try {
     const updatedFarmer = await prisma.farmer.update({
       where: { id: req.params.id },
-      data: { name, contact, farmDetails },
+      data: { name, contact, farmDetails, location },
     });
 
-    res.status(200).json(updatedFarmer);
+    res.status(200).json({
+      message: 'Farmer updated successfully',
+      updatedFarmer,
+    });
   } catch (err) {
+    console.error('Error details:', err); // Log error for debugging
     res.status(400).send('Error updating farmer');
   }
 };
-export { createFarmer, getFarmerById, updateFarmer };
+
+export default { createFarmer, getFarmerById, updateFarmer };
