@@ -33,7 +33,6 @@ generator client {
 }
 
 
-
 model Produce {
   id            String        @id @default(uuid())
   farmerId      String
@@ -45,7 +44,9 @@ model Produce {
   shipments     Shipment[]
   qrCode        QRCode?
   status        ProduceStatus @default(HARVESTED) // Default to HARVESTED
+  isBiofortified Boolean      @default(false) // New field to track biofortification
 }
+
 
 model Transporter {
   id            String   @id @default(uuid())
@@ -77,14 +78,16 @@ model Shipment {
 }
 
 model Farmer {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   name        String
-  contact     String   @unique
+  contact     String    @unique
   location    String
   password    String
   farmDetails String?
-  role        String   @default("farmer") // Add role field
+  role        String    @default("farmer")
   produce     Produce[]
+  groupId     String?  
+  group       Group?    @relation("GroupFarmers", fields: [groupId], references: [id])
 }
 
 model Customer {
@@ -104,4 +107,13 @@ model QRCode {
   produce    Produce  @relation(fields: [produceId], references: [id])
   generatedAt DateTime @default(now())
   scannedAt   DateTime?
+}
+
+model Group {
+  id          String    @id @default(uuid())
+  cropType    String
+  farmers     Farmer[]  @relation("GroupFarmers")
+  totalQuantity Int      @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
