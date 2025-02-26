@@ -22,4 +22,13 @@ const getShipments = async (req, res) => {
   }
 };
 
-export { createShipment, getShipments };
+const getShipment = async(req,res) => {
+  try{
+    const shipment = await prisma.shipment.findUnique();
+    res.json(shipment)
+  } catch(error){
+    res.status(500).json({error: error.message})
+  }
+}
+
+export { createShipment, getShipments,getShipment };

@@ -1,4 +1,3 @@
-To create a functional MVP of this website, we will break it down into key features:
 
 ### 1. **Farmer Authentication & Management**
    - **Farmer Registration:** A simple form to allow farmers to register with details like name, farm location, contact details, and farm type.

@@ -30,6 +30,7 @@ import shipmentRoutes from './routes/shipmentRoutes.js';
 import customerRoutes from './routes/customerRoutes.js';
 import qrCodeRoutes from './routes/qrCodeRoutes.js';
 import authRoutes from './routes/authRoutes.js';
+import celoCropRegisterRoutes from './routes/celoCropRegisterRoutes.js';
 
 dotenv.config();
 
@@ -45,6 +46,7 @@ app.use('/shipments', shipmentRoutes);
 app.use('/customers', customerRoutes);
 app.use('/qrcodes', qrCodeRoutes);
 app.use('/auth', authRoutes);
+app.use('/celoblockchain', celoCropRegisterRoutes);
 
 app.get('/', (req, res) => {
   res.send('Food Traceability API is running');

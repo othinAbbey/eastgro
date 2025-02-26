@@ -54,6 +54,8 @@ model Transporter {
   vehicleDetails String?
   contact       String
   shipments     Shipment[]
+  status        String
+  Region String
 }
 
 model Facility {
@@ -75,6 +77,7 @@ model Shipment {
   destination   String
   status        ShipmentStatus @default(PENDING) // Default to PENDING
   deliveryDate  DateTime?
+  
 }
 
 model Farmer {
@@ -116,4 +119,20 @@ model Group {
   totalQuantity Int      @default(0)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+}
+
+model Problem {
+  id      String   @id @default(uuid())
+  farmtype String 
+  farmer  Farmer @relation(fields: [farmerId], references: [id])
+  Crop    String
+  Disease String
+  Pest    String
+}
+
+model Report {
+  id String @id @default(uuid())
+  From DateTime
+  To  DateTime
+  
 }
