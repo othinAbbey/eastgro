@@ -1,4 +1,4 @@
-// Enum for different produce statuses
+// Enums for statuses and quality grades
 enum ProduceStatus {
   HARVESTED
   IN_TRANSIT
@@ -6,7 +6,6 @@ enum ProduceStatus {
   DELIVERED
 }
 
-// Enum for different shipment statuses
 enum ShipmentStatus {
   PENDING
   IN_TRANSIT
@@ -14,13 +13,19 @@ enum ShipmentStatus {
   RETURNED
 }
 
-// Enum for quality grades
 enum QualityGrade {
   A
   B
   C
   D
   FAILED
+}
+
+enum ProblemStatus {
+  REPORTED
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
 }
 
 datasource db {
@@ -32,7 +37,6 @@ generator client {
   provider = "prisma-client-js"
 }
 
-
 model Produce {
   id            String        @id @default(uuid())
   farmerId      String
@@ -43,27 +47,20 @@ model Produce {
   qualityReport QualityGrade?
   shipments     Shipment[]
   qrCode        QRCode?
-  status        ProduceStatus @default(HARVESTED) // Default to HARVESTED
-  isBiofortified Boolean      @default(false) // New field to track biofortification
+  status        ProduceStatus @default(HARVESTED)
+  isBiofortified Boolean      @default(false)
+  storage       Storage?      // Relation to storage (One-to-One)
 }
 
-
-model Transporter {
-  id            String   @id @default(uuid())
-  name          String
-  vehicleDetails String?
-  contact       String
-  shipments     Shipment[]
-  status        String
-  Region String
-}
-
-model Facility {
-  id               String   @id @default(uuid())
-  name             String
-  location         String
-  processingDetails String?
-  shipments        Shipment[]
+model Storage {
+  id          String   @id @default(uuid())
+  facilityId  String
+  facility    Facility @relation(fields: [facilityId], references: [id])
+  produceId   String   @unique
+  produce     Produce  @relation(fields: [produceId], references: [id])
+  quantity    Int
+  storedAt    DateTime @default(now())
+  shipments   Shipment[] // Relation to shipments storing produce
 }
 
 model Shipment {
@@ -74,10 +71,30 @@ model Shipment {
   transporter   Transporter? @relation(fields: [transporterId], references: [id])
   facilityId    String?
   facility      Facility?    @relation(fields: [facilityId], references: [id])
+  storageId     String?
+  storage       Storage?     @relation(fields: [storageId], references: [id]) // Links to storage
   destination   String
-  status        ShipmentStatus @default(PENDING) // Default to PENDING
+  status        ShipmentStatus @default(PENDING)
   deliveryDate  DateTime?
-  
+}
+
+model Transporter {
+  id            String   @id @default(uuid())
+  name          String
+  vehicleDetails String?
+  contact       String
+  shipments     Shipment[]
+  status        String
+  Region        String
+}
+
+model Facility {
+  id               String   @id @default(uuid())
+  name             String
+  location         String
+  processingDetails String?
+  shipments        Shipment[]
+  storage          Storage[]
 }
 
 model Farmer {
@@ -91,12 +108,13 @@ model Farmer {
   produce     Produce[]
   groupId     String?  
   group       Group?    @relation("GroupFarmers", fields: [groupId], references: [id])
+  problems    Problem[]  // A farmer can report multiple problems
 }
 
 model Customer {
   id               String   @id @default(uuid())
   name             String
-  password    String
+  password         String
   contact          String   @unique // Ensure contact is unique
   purchaseHistory  String?
   role             String   @default("customer")
@@ -121,18 +139,31 @@ model Group {
   updatedAt   DateTime  @updatedAt
 }
 
+// New model to track problems reported by farmers
 model Problem {
-  id      String   @id @default(uuid())
-  farmtype String 
-  farmer  Farmer @relation(fields: [farmerId], references: [id])
-  Crop    String
-  Disease String
-  Pest    String
+  id        String   @id @default(uuid())
+  farmtype  String 
+  farmerId  String
+  farmer    Farmer   @relation(fields: [farmerId], references: [id])
+  Crop      String
+  Disease   String
+  Pest      String
+  progress  ProblemProgress[]  // One-to-many relation to ProblemProgress
+}
+
+// New model to track the progress of a problem being solved
+model ProblemProgress {
+  id          String        @id @default(uuid())
+  problemId   String        // Foreign key reference to Problem
+  problem     Problem       @relation(fields: [problemId], references: [id])
+  update      String        // Description of progress update
+  updatedBy   String        // Who made the update (e.g., an expert, farmer, system)
+  status      ProblemStatus @default(REPORTED) // Tracks problem resolution stages
+  updatedAt   DateTime      @default(now())
 }
 
 model Report {
   id String @id @default(uuid())
   From DateTime
   To  DateTime
-  
 }

@@ -1,10 +1,16 @@
 import ContractKit from '@celo/contractkit';
 import Web3 from 'web3';
+
 const web3 = new Web3('https://alfajores-forno.celo-testnet.org');
 const kit = ContractKit.newKitFromWeb3(web3);
 
-const registerCrop = async (farmerId, cropDetails) => {
+const ABI = []; // Replace with actual contract ABI
+const CONTRACT_ADDRESS = ''; // Replace with actual contract address
+
+const registerCrop = async (req, res) => {
   try {
+    const { farmerId, cropDetails } = req.body;
+
     const accounts = await kit.web3.eth.getAccounts();
     kit.defaultAccount = accounts[0];
 
@@ -14,10 +20,10 @@ const registerCrop = async (farmerId, cropDetails) => {
       .registerCrop(farmerId, cropDetails)
       .send({ from: kit.defaultAccount });
 
-    return { success: true, message: 'Crop registered on blockchain' };
+    res.status(200).json({ success: true, message: 'Crop registered on blockchain' });
   } catch (error) {
-    return { success: false, message: error.message };
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-export default registerCrop
+export default registerCrop;
