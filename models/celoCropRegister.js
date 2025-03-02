@@ -20,4 +20,4 @@ const registerCrop = async (farmerId, cropDetails) => {
   }
 };
 
-export default registerCrop
+export { registerCrop };

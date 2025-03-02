@@ -27,8 +27,8 @@ router.post('/register', customerController.createCustomer);
 
 // Get customer details by ID (only the customer or authorized roles can access)
 router.get('/customer/:id', roleMiddleware(['customer']), customerController.getCustomerById);
-
+// router.get('/customer:id', customerController.getCustomerById);
 // Update customer details
-router.put('/customer:id', roleMiddleware(['customer']), customerController.updateCustomer);
+router.put('/customer/:id', roleMiddleware(['customer']), customerController.updateCustomer);
 
 export default router;

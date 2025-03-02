@@ -48,9 +48,10 @@ const createCustomer = async (req, res) => {
 };
 
 const getCustomerById = async (req, res) => {
+  const id = req.params.id;
   try {
     const customer = await prisma.customer.findUnique({
-      where: { id: req.params.id },
+      where: { id:id },
     });
 
     if (!customer) {
@@ -64,23 +65,59 @@ const getCustomerById = async (req, res) => {
   }
 };
 
+// const updateCustomer = async (req, res) => {
+//   const id = req.params.id;
+//   const { name, contact, purchaseHistory } = req.body;
+
+//   try {
+//     const updatedCustomer = await prisma.customer.update({
+//       where: { id: id },
+//       data: { name, contact, purchaseHistory },
+//     });
+
+//     res.status(200).json({
+//       message: 'Customer updated successfully',
+//       updatedCustomer,
+//     });
+//   } catch (err) {
+//     console.error('Error details:', err); // Log error for debugging
+//     res.status(400).send('Error updating customer');
+//   }
+// };
+
 const updateCustomer = async (req, res) => {
+  const id = req.params.id;
   const { name, contact, purchaseHistory } = req.body;
 
   try {
+    // Fetch current customer details
+    const customer = await prisma.customer.findUnique({
+      where: { id: id },
+    });
+
+    if (!customer) {
+      return res.status(404).json({ message: "Customer not found" });
+    }
+
+    // Check if the name is different from the one in the database
+    if (name && name !== customer.name) {
+      return res.status(400).json({ message: "Name cannot be edited" });
+    }
+
     const updatedCustomer = await prisma.customer.update({
-      where: { id: req.params.id },
-      data: { name, contact, purchaseHistory },
+      where: { id: id },
+      data: { contact, purchaseHistory }, // Only update allowed fields
     });
 
     res.status(200).json({
-      message: 'Customer updated successfully',
+      message: "Customer updated successfully",
       updatedCustomer,
     });
   } catch (err) {
-    console.error('Error details:', err); // Log error for debugging
-    res.status(400).send('Error updating customer');
+    console.error("Error details:", err);
+    res.status(400).send("Error updating customer");
   }
 };
+
 
 export default { createCustomer, getCustomerById, updateCustomer };

@@ -12,10 +12,11 @@
 // module.exports = router;
 
 import express from 'express';
-import { createProduce, getProduce } from '../controllers/productController.js';
+import { createProduce, getProduce,getProduceList } from '../controllers/produceController.js';
 const router = express.Router();
 
 router.post('/', createProduce);
 router.get('/', getProduce);
+router.get('/list', getProduceList);
 
 export default router;

@@ -23,7 +23,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import farmerRoutes from './routes/farmerRoutes.js';
-import produceRoutes from './routes/productRoutes.js';
+import produceRoutes from './routes/produceRoutes.js';
 import transporterRoutes from './routes/transportRoutes.js';
 import facilityRoutes from './routes/facilityRoutes.js';
 import shipmentRoutes from './routes/shipmentRoutes.js';
@@ -31,6 +31,8 @@ import customerRoutes from './routes/customerRoutes.js';
 import qrCodeRoutes from './routes/qrCodeRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import celoCropRegisterRoutes from './routes/celoCropRegisterRoutes.js';
+import cropRegisterRoutes from './routes/cropRegisterRoutes.js';
+
 
 dotenv.config();
 
@@ -41,12 +43,13 @@ app.use(cors());
 app.use('/farmers', farmerRoutes);
 app.use('/produce', produceRoutes);
 app.use('/transporters', transporterRoutes);
-app.use('/facilities', facilityRoutes);
+app.use('/facility', facilityRoutes);
 app.use('/shipments', shipmentRoutes);
 app.use('/customers', customerRoutes);
 app.use('/qrcodes', qrCodeRoutes);
 app.use('/auth', authRoutes);
 app.use('/celoblockchain', celoCropRegisterRoutes);
+app.use('/crops', cropRegisterRoutes,)
 
 app.get('/', (req, res) => {
   res.send('Food Traceability API is running');

@@ -1,3 +1,201 @@
+// // Enums for statuses and quality grades
+// enum ProduceStatus {
+//   HARVESTED
+//   IN_TRANSIT
+//   PROCESSED
+//   DELIVERED
+// }
+
+// enum ShipmentStatus {
+//   PENDING
+//   IN_TRANSIT
+//   DELIVERED
+//   RETURNED
+// }
+
+// enum QualityGrade {
+//   A
+//   B
+//   C
+//   D
+//   FAILED
+// }
+
+// enum ProblemStatus {
+//   REPORTED
+//   IN_PROGRESS
+//   RESOLVED
+//   CLOSED
+// }
+
+// datasource db {
+//   provider = "postgresql"
+//   url      = env("DATABASE_URL")
+// }
+
+// generator client {
+//   provider = "prisma-client-js"
+// }
+
+// model Produce {
+//   id            String        @id @default(uuid())
+//   farmerId      String?       // Optional: Some produce may not be tied to a specific farmer
+//   farmer        Farmer?       @relation(fields: [farmerId], references: [id])
+//   type          String
+//   quantity      Int
+//   harvestDate   DateTime
+//   qualityReport QualityGrade?
+//   shipments     Shipment[]    // Relation to shipments linked to this produce
+//   qrCode        QRCode?       // Optional QR Code relation
+//   status        ProduceStatus @default(HARVESTED)
+//   isBiofortified Boolean      @default(false)
+//   storage       Storage?      // Relation to storage (One-to-One)
+
+//   loadAtFacility loadAtFacility[]
+// }
+
+// model Storage {
+//   id          String   @id @default(uuid())
+//   facilityId  String
+//   facility    Facility @relation(fields: [facilityId], references: [id])
+//   produceId   String   @unique
+//   produce     Produce  @relation(fields: [produceId], references: [id])
+//   quantity    Int
+//   storedAt    DateTime @default(now())
+//   shipments   Shipment[] // Relation to shipments storing produce
+// }
+
+// model Shipment {
+//   id            String       @id @default(uuid())
+//   produceId     String
+//   produce       Produce      @relation(fields: [produceId], references: [id])
+//   transporterId String?
+//   transporter   Transporter? @relation(fields: [transporterId], references: [id])
+//   facilityId    String?
+//   facility      Facility?    @relation(fields: [facilityId], references: [id])
+//   storageId     String?
+//   storage       Storage?     @relation(fields: [storageId], references: [id]) // Links to storage
+//   destination   String
+//   status        ShipmentStatus @default(PENDING)
+//   deliveryDate  DateTime?
+
+//   loadAtFacility loadAtFacility[]
+// }
+
+// model Transporter {
+//   id            String   @id @default(uuid())
+//   name          String
+//   vehicleDetails String?
+//   contact       String
+//   shipments     Shipment[]
+//   status        String
+//   Region        String
+// }
+
+// model Facility {
+//   id               String   @id @default(uuid())
+//   name             String
+//   location         String
+//   processingDetails String?
+//   shipments        Shipment[] // Relation to shipments
+//   storage          Storage[]  // Relation to storage
+//   loads            loadAtFacility[] // Relation to loadAtFacility
+// }
+
+
+
+// model Farmer {
+//   id          String    @id @default(uuid())  // Ensure `id` is a String, UUID
+//   name        String
+//   contact     String    @unique
+//   location    String
+//   password    String
+//   farmDetails String?
+//   role        String    @default("farmer")
+//   produce     Produce[] // One-to-many relationship with Produce
+//   groupId     String?  
+//   group       Group?    @relation("GroupFarmers", fields: [groupId], references: [id])
+//   problems    Problem[] // A farmer can report multiple problems
+//   crops       Crop[]    // Relationship to crops the farmer grows
+// }
+
+// model Customer {
+//   id               String   @id @default(uuid())
+//   name             String
+//   password         String
+//   contact          String   @unique // Ensure contact is unique
+//   purchaseHistory  String?
+//   role             String   @default("customer")
+//   createdAt        DateTime @default(now())
+//   updatedAt        DateTime @updatedAt
+// }
+
+// model QRCode {
+//   id         String   @id @default(uuid())
+//   produceId  String   @unique
+//   produce    Produce  @relation(fields: [produceId], references: [id])
+//   generatedAt DateTime @default(now())
+//   scannedAt   DateTime?
+// }
+
+// model Group {
+//   id          String    @id @default(uuid())
+//   cropType    String
+//   farmers     Farmer[]  @relation("GroupFarmers")
+//   totalQuantity Int      @default(0)
+//   createdAt   DateTime  @default(now())
+//   updatedAt   DateTime  @updatedAt
+// }
+
+// // New model to track problems reported by farmers
+// model Problem {
+//   id        String   @id @default(uuid())
+//   farmtype  String 
+//   farmerId  String
+//   farmer    Farmer   @relation(fields: [farmerId], references: [id])
+//   Crop      String
+//   Disease   String
+//   Pest      String
+//   progress  ProblemProgress[]  // One-to-many relation to ProblemProgress
+// }
+
+// // New model to track the progress of a problem being solved
+// model ProblemProgress {
+//   id          String        @id @default(uuid())
+//   problemId   String        // Foreign key reference to Problem
+//   problem     Problem       @relation(fields: [problemId], references: [id])
+//   update      String        // Description of progress update
+//   updatedBy   String        // Who made the update (e.g., an expert, farmer, system)
+//   status      ProblemStatus @default(REPORTED) // Tracks problem resolution stages
+//   updatedAt   DateTime      @default(now())
+// }
+
+// model Report {
+//   id String @id @default(uuid())
+//   From DateTime
+//   To  DateTime
+// }
+
+// model Crop {
+//   id        String   @id @default(uuid())
+//   type      String   // Type of crop (e.g., maize, wheat, etc.)
+//   region    String   // Region where the crop is grown
+//   farmerId  String?  // Optional field that links to the Farmer model
+//   farmer    Farmer?  @relation(fields: [farmerId], references: [id]) // Optional relationship to Farmer
+//   createdAt DateTime @default(now())  // Timestamp when the crop is registered
+// }
+
+// model loadAtFacility {
+//   id          String   @id @default(uuid())
+//   facilityId  String
+//   facility    Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+//   produceId   String
+//   produce     Produce  @relation(fields: [produceId], references: [id])
+//   quantity    Int
+//   loadedAt    DateTime @default(now())
+//   shipments   Shipment[] // Relation to shipments storing produce
+// }
+
 // Enums for statuses and quality grades
 enum ProduceStatus {
   HARVESTED
@@ -38,18 +236,23 @@ generator client {
 }
 
 model Produce {
-  id            String        @id @default(uuid())
-  farmerId      String
-  farmer        Farmer        @relation(fields: [farmerId], references: [id])
-  type          String
-  quantity      Int
-  harvestDate   DateTime
-  qualityReport QualityGrade?
-  shipments     Shipment[]
-  qrCode        QRCode?
-  status        ProduceStatus @default(HARVESTED)
-  isBiofortified Boolean      @default(false)
-  storage       Storage?      // Relation to storage (One-to-One)
+  id              String        @id @default(uuid())
+  farmerId        String?       // Optional: Some produce may not be tied to a specific farmer
+  farmer          Farmer?       @relation(fields: [farmerId], references: [id])
+  type            String
+  quantity        Int
+  harvestDate     DateTime
+  qualityReport   QualityGrade?
+  shipments       Shipment[]    // Relation to shipments linked to this produce
+  qrCode          QRCode?       // Optional QR Code relation
+  status          ProduceStatus @default(HARVESTED)
+  isBiofortified  Boolean       @default(false)
+  storage         Storage?      // Relation to storage (One-to-One)
+
+  loadAtFacility  loadAtFacility[] // Relation to loadAtFacility
+
+  // New relation field to track facilities that handle this produce
+  facilities      Facility[]     @relation("ProduceFacilities")
 }
 
 model Storage {
@@ -76,6 +279,8 @@ model Shipment {
   destination   String
   status        ShipmentStatus @default(PENDING)
   deliveryDate  DateTime?
+
+  loadAtFacility loadAtFacility[] // Relation to loadAtFacility
 }
 
 model Transporter {
@@ -93,22 +298,30 @@ model Facility {
   name             String
   location         String
   processingDetails String?
-  shipments        Shipment[]
-  storage          Storage[]
+  shipments        Shipment[] // Relation to shipments
+  storage          Storage[]  // Relation to storage
+  loads            loadAtFacility[] // Relation to loadAtFacility
+
+  // New relation field to link facilities to the produce they can handle
+  producesHandled  Produce[]  @relation("ProduceFacilities")
+
+  // Field to track the total workload at the facility
+  workload         Int        @default(0)  // Sum of quantities from loadAtFacility
 }
 
 model Farmer {
-  id          String    @id @default(uuid())
+  id          String    @id @default(uuid())  // Ensure `id` is a String, UUID
   name        String
   contact     String    @unique
   location    String
   password    String
   farmDetails String?
   role        String    @default("farmer")
-  produce     Produce[]
+  produce     Produce[] // One-to-many relationship with Produce
   groupId     String?  
   group       Group?    @relation("GroupFarmers", fields: [groupId], references: [id])
-  problems    Problem[]  // A farmer can report multiple problems
+  problems    Problem[] // A farmer can report multiple problems
+  crops       Crop[]    // Relationship to crops the farmer grows
 }
 
 model Customer {
@@ -139,7 +352,6 @@ model Group {
   updatedAt   DateTime  @updatedAt
 }
 
-// New model to track problems reported by farmers
 model Problem {
   id        String   @id @default(uuid())
   farmtype  String 
@@ -151,7 +363,6 @@ model Problem {
   progress  ProblemProgress[]  // One-to-many relation to ProblemProgress
 }
 
-// New model to track the progress of a problem being solved
 model ProblemProgress {
   id          String        @id @default(uuid())
   problemId   String        // Foreign key reference to Problem
@@ -166,4 +377,24 @@ model Report {
   id String @id @default(uuid())
   From DateTime
   To  DateTime
+}
+
+model Crop {
+  id        String   @id @default(uuid())
+  type      String   // Type of crop (e.g., maize, wheat, etc.)
+  region    String   // Region where the crop is grown
+  farmerId  String?  // Optional field that links to the Farmer model
+  farmer    Farmer?  @relation(fields: [farmerId], references: [id]) // Optional relationship to Farmer
+  createdAt DateTime @default(now())  // Timestamp when the crop is registered
+}
+
+model loadAtFacility {
+  id          String   @id @default(uuid())
+  facilityId  String
+  facility    Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  produceId   String
+  produce     Produce  @relation(fields: [produceId], references: [id])
+  quantity    Int
+  loadedAt    DateTime @default(now())
+  shipments   Shipment[] // Relation to shipments storing produce
 }

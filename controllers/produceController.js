@@ -49,5 +49,21 @@ const getProduce = async (req, res) => {
   }
 };
 
+//Get a list of the ids and name of the produce from the produce tabel,
+//This is used to populate the dropdown list in the frontend
+const getProduceList = async (req, res) => {
+  try {
+    const produce = await prisma.produce.findMany({
+      select: {
+        id: true,
+        type: true,
+      },
+    });
+    res.json(produce);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
 
-export { createProduce, getProduce };
+
+export { createProduce, getProduce, getProduceList };
