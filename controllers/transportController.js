@@ -3,9 +3,9 @@ const prisma = new PrismaClient();
 
 const createTransporter = async (req, res) => {
   try {
-    const { name, contact, vehicleDetails } = req.body;
+    const { name, contact, vehicleDetails,status,Region} = req.body;
     const transporter = await prisma.transporter.create({
-      data: { name, contact, vehicleDetails },
+      data: { name, contact, vehicleDetails,status,Region },
     });
     res.json(transporter);
   } catch (error) {

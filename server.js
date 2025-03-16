@@ -32,7 +32,7 @@ import qrCodeRoutes from './routes/qrCodeRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import celoCropRegisterRoutes from './routes/celoCropRegisterRoutes.js';
 import cropRegisterRoutes from './routes/cropRegisterRoutes.js';
-
+import salesRoutes from './routes/salesRoutes.js'
 
 dotenv.config();
 
@@ -50,6 +50,24 @@ app.use('/qrcodes', qrCodeRoutes);
 app.use('/auth', authRoutes);
 app.use('/celoblockchain', celoCropRegisterRoutes);
 app.use('/crops', cropRegisterRoutes,)
+app.use('/sales', salesRoutes)
+
+// //sales routes
+// app.get('/listings', salesController.getMarketListings); // Fetch available biofortified crop listings
+// app.post('/group', salesController.groupFarmersByCrop); // Group farmers by crop type
+// app.post('/offer', salesController.placeOffer); // Place an offer on a crop
+// app.get('/transactions/:userId', salesController.getTransactionHistory); // Get transaction history for a buyer
+// app.post('/products', salesController.createProduct); // Create a new product
+// app.get('/products', salesController.getAllProducts); // Get all products
+// app.get('/products/:id', salesController.getProductById); // Get a product by ID
+// app.put('/products/:id', salesController.updateProduct); // Update a product by ID
+// app.delete('/products/:id', salesController.deleteProduct); // Delete a product by ID
+// app.post('/transactions', salesController.createTransaction); // Create a new transaction
+// app.get('/transactions', salesController.getAllTransactions); // Get all transactions
+// app.get('/transactions/:id', salesController.getTransactionById); // Get a transaction by ID
+// app.put('/transactions/:id', salesController.updateTransaction); // Update a transaction by ID
+// app.delete('/transactions/:id', salesController.deleteTransaction); // Delete a transaction by ID
+
 
 app.get('/', (req, res) => {
   res.send('Food Traceability API is running');

@@ -1,8 +1,0 @@
-/*
-  Warnings:
-
-  - A unique constraint covering the columns `[contact]` on the table `Farmer` will be added. If there are existing duplicate values, this will fail.
-
-*/
--- CreateIndex
-CREATE UNIQUE INDEX "Farmer_contact_key" ON "Farmer"("contact");
