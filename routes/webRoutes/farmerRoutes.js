@@ -23,8 +23,8 @@
 
 
 import express from 'express';
-import farmerController from '../controllers/farmerController.js';
-import roleMiddleware from '../middleware/roleMiddleware.js';
+import farmerController from '../../controllers/farmerController.js';
+import roleMiddleware from '../../middleware/roleMiddleware.js';
 const router = express.Router();
 
 // Create a new farmer (admin or authorized role)

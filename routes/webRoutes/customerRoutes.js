@@ -19,8 +19,8 @@
 
 
 import express from 'express';
-import roleMiddleware from '../middleware/roleMiddleware.js';
-import customerController from '../controllers/customerController.js';
+import roleMiddleware from '../../middleware/roleMiddleware.js';
+import customerController from '../../controllers/customerController.js';
 const router = express.Router();
 // Create a new customer
 router.post('/register', customerController.createCustomer);

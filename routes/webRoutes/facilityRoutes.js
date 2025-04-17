@@ -1,5 +1,5 @@
 import express from 'express';
-import facilityController from '../controllers/facilityController.js';
+import facilityController from '../../controllers/facilityController.js';
 const router = express.Router();
 
 

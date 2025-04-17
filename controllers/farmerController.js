@@ -6,75 +6,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import {registerCrop} from '../controllers/cropRegisterController.js'; // Import the registerproduce function
 
-// const createFarmer = async (req, res) => {
-//   const { name, contact, password, farmDetails, location, produces } = req.body; // produces will be an array of produce names
 
-//   try {
-//     // Check if the farmer already exists
-//     const existingFarmer = await prisma.farmer.findUnique({
-//       where: { contact },
-//     });
-
-//     if (existingFarmer) {
-//       return res.status(400).json({ message: 'Farmer with this contact already exists' });
-//     }
-
-//     // Hash the password before saving
-//     const hashedPassword = await bcrypt.hash(password, 10);
-
-//     // Create the farmer record
-//     const farmer = await prisma.farmer.create({
-//       data: {
-//         name,
-//         contact,
-//         password: hashedPassword,
-//         farmDetails,
-//         role: 'farmer',
-//         location,
-//       },
-//     });
-
-//     // Process the produces selected by the farmer using the registerproduce function
-//     let farmerproduces = [];
-//     for (let produceName of produces) {
-//       // Use the registerproduce function to either create or get the produce
-//       const produce = await registerproduce(produceName);
-
-//       // Add the produce to the farmer's produces
-//       farmerproduces.push({ id: produce.id });
-//     }
-
-//     // Link the produces to the farmer (Many-to-many relationship)
-//     await prisma.farmer.update({
-//       where: { id: farmer.id },
-//       data: {
-//         produces: {
-//           connect: farmerproduces, // Connecting the existing or newly created produces
-//         },
-//       },
-//     });
-
-//     // Generate JWT for the newly created farmer
-//     const token = jwt.sign({ id: farmer.id, role: 'farmer' }, process.env.JWT_SECRET, { expiresIn: '1h' });
-
-//     // Send token and farmer data in the response
-//     res.status(201).json({
-//       message: 'Farmer created successfully',
-//       token, // JWT token
-//       farmer: {
-//         id: farmer.id,
-//         name: farmer.name,
-//         contact: farmer.contact,
-//         farmDetails: farmer.farmDetails,
-//         location: farmer.location,
-//         produces, // Include produces in the response
-//       },
-//     });
-//   } catch (err) {
-//     console.error('Error details:', err); // Log the full error for debugging
-//     res.status(500).send('Error creating farmer');
-//   }
-// };
 const createFarmer = async (req, res) => {
   const { name, contact, password, farmDetails, location, produce } = req.body;
 

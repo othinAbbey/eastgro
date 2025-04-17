@@ -1,5 +1,5 @@
 import express from 'express';
-import { createTransporter, getTransporters,getTransporter} from '../controllers/transportController.js';
+import { createTransporter, getTransporters,getTransporter} from '../../controllers/transportController.js';
 const router = express.Router();
 
 router.post('/', createTransporter);

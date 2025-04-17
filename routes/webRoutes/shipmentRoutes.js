@@ -1,5 +1,5 @@
 import express from 'express';
-import { createShipment, getShipments ,getShipment} from '../controllers/shipmentController.js';
+import { createShipment, getShipments ,getShipment} from '../../controllers/shipmentController.js';
 const router = express.Router();
 
 router.post('/', createShipment);

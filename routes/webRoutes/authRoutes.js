@@ -12,7 +12,7 @@ if (!process.env.JWT_SECRET) {
 }
 
 router.post('/login', async (req, res) => {
-  const { contact, password } = req.body;
+  const { contact, password,role } = req.body;
 
   try {
     // Run both queries in parallel

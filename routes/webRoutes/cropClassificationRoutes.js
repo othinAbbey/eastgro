@@ -1,6 +1,6 @@
 // Description: This file contains the routes for crop classification.
 import express from 'express';
-import { classifyCrop } from '../models/cropClassification.js';
+import { classifyCrop } from '../../models/cropClassification.js';
 const router = express.Router();
 
 router.post('/classify-crop', async (req, res) => {

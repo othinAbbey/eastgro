@@ -14,7 +14,7 @@
 // routes/CropRoutes.js
 
 import express from 'express';
-import { celoCropRegistration } from '../controllers/celoController.js';
+import { celoCropRegistration } from '../../controllers/celoController.js';
 
 const router = express.Router();
 

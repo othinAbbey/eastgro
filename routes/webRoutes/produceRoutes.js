@@ -12,7 +12,7 @@
 // module.exports = router;
 
 import express from 'express';
-import { createProduce, getProduce,getProduceList } from '../controllers/produceController.js';
+import { createProduce, getProduce,getProduceList } from '../../controllers/produceController.js';
 const router = express.Router();
 
 router.post('/', createProduce);

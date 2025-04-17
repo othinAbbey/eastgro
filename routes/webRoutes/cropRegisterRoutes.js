@@ -1,5 +1,5 @@
 import express from 'express';
-import { registerCrop, getAllCrops, getCropById, updateCrop, deleteCrop } from '../controllers/cropRegisterController.js';
+import { registerCrop, getAllCrops, getCropById, updateCrop, deleteCrop } from '../../controllers/cropRegisterController.js';
 
 const router = express.Router();
 
