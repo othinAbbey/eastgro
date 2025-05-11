@@ -1,6 +1,6 @@
 // routes/ussdRoutes.js
 import express from 'express';
-import USSDController from '../../controllers/ussdController.js';
+import USSDController from '../../controllers/SMS and USSD/ussdController.js';
 
 const router = express.Router();
 

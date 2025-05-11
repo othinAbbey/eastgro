@@ -211,13 +211,15 @@ model Farmer {
   location    String
   password    String
   farmDetails String?
-  role        String  @default("farmer")
+  //make farmer use roleenums
+  role        String  @default("FARMER")
 
   groupId  String?
-  group    Group?    @relation("GroupFarmers", fields: [groupId], references: [id])
+  group    Group?     @relation("GroupFarmers", fields: [groupId], references: [id])
   produce  Produce[]
   problems Problem[]
-  products Product[] @relation("FarmerProducts")
+  products Product[]  @relation("FarmerProducts")
+  FarmPlan FarmPlan[]
 }
 
 model Customer {
@@ -311,27 +313,26 @@ model TraceabilityLog {
 
 // ================== SERVICE PROVIDERS ==================
 model ServiceProvider {
-  id           String   @id @default(uuid())
-  name         String
-  contact      String   @unique
-  email        String   @unique
-  password     String
-  businessName String
-  description  String?
-  location     String
-  region       String   @default("Eastern")
-  rating       Float?   @default(0.0)
-  isVerified   Boolean  @default(false)
-  role         UserRole @default(EXPERT)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
+  id              String             @id @default(uuid())
+  name            String
+  contact         String             @unique
+  email           String             @unique
+  password        String
+  businessName    String
+  description     String?
+  location        String
+  region          String             @default("Eastern")
+  rating          Float?             @default(0.0)
+  isVerified      Boolean            @default(false)
+  role            UserRole           @default(EXPERT)
+  createdAt       DateTime           @default(now())
+  // updatedAt DateTime @updatedAt()
   // Service details
-  servicesOffered ServiceOffering[]
+  servicesOffered ServiceOfferings[]
   qualifications  String[] // Array of certifications/qualifications
   equipment       String[] // Array of equipment available
   minOrderAmount  Float? // Minimum order value required
-  availability    String            @default("Monday-Friday, 8AM-5PM")
+  availability    String             @default("Monday-Friday, 8AM-5PM")
   travelRadius    Int? // Maximum distance they'll travel (in km)
   profileImage    String? // URL to profile image
 
@@ -354,7 +355,7 @@ model ServiceProvider {
 //   serviceProvider ServiceProvider @relation(fields: [serviceProviderId], references: [id])
 // }
 
-model ServiceOffering {
+model ServiceOfferings {
   id                String  @id @default(uuid())
   serviceId         String
   serviceProviderId String
@@ -383,7 +384,7 @@ model Service {
   updatedAt   DateTime @updatedAt
 
   // Add provider relationship
-  providers ServiceOffering[]
+  providers ServiceOfferings[]
 
   // Existing relation
   transactions Transaction[] @relation("TransactionServices")
@@ -409,9 +410,7 @@ model Service {
 //   FarmInput FarmInput[] @relation("TransactionInputs")
 // }
 
- 
-
- model Transaction {
+model Transaction {
   id            String @id @default(uuid())
   buyerId       String
   totalAmount   Int
@@ -423,10 +422,164 @@ model Service {
   serviceProvider   ServiceProvider? @relation(fields: [serviceProviderId], references: [id], name: "ServiceProviderTransactions")
 
   // Existing relations
-  buyer     Customer    @relation(fields: [buyerId], references: [id])
-  products  Product[]   @relation("TransactionProducts")
-  produce   Produce[]   @relation("TransactionProduce")
-  services  Service[]   @relation("TransactionServices")
-  FarmInput FarmInput[] @relation("TransactionInputs")
-  serviceOfferings ServiceOffering[] 
+  buyer            Customer           @relation(fields: [buyerId], references: [id])
+  products         Product[]          @relation("TransactionProducts")
+  produce          Produce[]          @relation("TransactionProduce")
+  services         Service[]          @relation("TransactionServices")
+  FarmInput        FarmInput[]        @relation("TransactionInputs")
+  serviceOfferings ServiceOfferings[]
+}
+
+////======================Farm Management=========================
+//// Agronomy Information
+
+model Crop {
+  id           String         @id @default(uuid())
+  name         String         @unique
+  description  String
+  agronomy     Agronomy[]
+  inputs       CropInput[]
+  pests        Pest[]
+  diseases     Disease[]
+  CropVariety  CropVariety[]
+  CostTemplate CostTemplate[]
+}
+
+model Agronomy {
+  id      String @id @default(uuid())
+  content String // Could be bullet points in markdown or separate items
+  cropId  String
+  crop    Crop   @relation(fields: [cropId], references: [id])
+}
+
+model CropInput {
+  id          String @id @default(uuid())
+  name        String
+  type        String // E.g. Herbicide, Fertilizer, etc.
+  description String
+  cropId      String
+  crop        Crop   @relation(fields: [cropId], references: [id])
+}
+
+model Pest {
+  id          String  @id @default(uuid())
+  name        String
+  description String
+  control     String? // Optional: How to control it
+  cropId      String
+  crop        Crop    @relation(fields: [cropId], references: [id])
+}
+
+model Disease {
+  id          String  @id @default(uuid())
+  name        String
+  description String
+  treatment   String? // Optional: How to treat it
+  cropId      String
+  crop        Crop    @relation(fields: [cropId], references: [id])
+}
+
+///=======Farm Managemnt======
+enum CostType {
+  ONE_TIME
+  SEASONAL
+  INVESTMENTCOSTS
+}
+
+enum Stage {
+  LAND_PREPARATION
+  PLANTING
+  MANAGEMENT
+  HARVEST
+  POST_HARVEST
+  MARKETING
+}
+
+model CropVariety {
+  id               String     @id @default(uuid())
+  name             String
+  description      String
+  daysToMaturity   Int
+  yieldPotential   String
+  kgPerAcre        Int // ✅ Add this to CropVariety model
+  yieldPerAcre     String // ✅ Add this to CropVariety model
+  cropId           String
+  crop             Crop       @relation(fields: [cropId], references: [id])
+  FarmPlan         FarmPlan[]
+  marketPricePerKg Float? // Optional: Market price per kg for this variety
+}
+
+model FarmPlan {
+  id           String   @id @default(uuid())
+  name         String
+  plantingDate DateTime
+  gardenSize   Float
+  farmerId     String
+  varietyId    String
+
+  // Estimates
+  estimatedYield   Float?
+  estimatedRevenue Float?
+  estimatedProfit  Float?
+
+  farmer     Farmer         @relation(fields: [farmerId], references: [id])
+  variety    CropVariety    @relation(fields: [varietyId], references: [id])
+  costs      Cost[]
+  activities FarmActivity[]
+  records    FarmRecord[]
+}
+
+// model CostTemplate {
+//   id       String   @id @default(uuid())
+//   costName String
+//   type     CostType
+//   stage    Stage
+//   amount   Float
+//   cropId   String
+//   crop     Crop     @relation(fields: [cropId], references: [id])
+// }
+model CostTemplate {
+  id          String   @id @default(uuid())
+  cropId      String
+  type        CostType
+  stage       Stage
+  // category    String
+  description String?
+  amount      Float
+  isRequired  Boolean  @default(true)
+
+  crop Crop @relation(fields: [cropId], references: [id])
+}
+model Cost {
+  id          String   @id @default(uuid())
+  farmPlanId  String
+  type        CostType
+  stage       Stage
+  // category    String
+  description String?
+  amount      Float
+  isCustom    Boolean  @default(false)
+
+  farmPlan FarmPlan @relation(fields: [farmPlanId], references: [id])
+}
+
+model FarmActivity {
+  id          String   @id @default(uuid())
+  farmPlanId  String
+  title       String
+  description String?
+  photoUrl    String?
+  timestamp   DateTime @default(now())
+
+  farmPlan FarmPlan @relation(fields: [farmPlanId], references: [id])
+}
+
+model FarmRecord {
+  id         String   @id @default(uuid())
+  farmPlanId String
+  type       String
+  details    String
+  createdAt  DateTime @default(now())
+
+  farmPlan FarmPlan @relation(fields: [farmPlanId], references: [id])
 }
