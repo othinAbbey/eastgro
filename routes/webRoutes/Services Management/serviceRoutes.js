@@ -5,8 +5,12 @@ const router = express.Router();
 import serviceController from '../../../controllers/Services Management/serviceController.js';
 
 // Auth middleware
-import authMiddleware from '../../../middleware/authMiddleware.js';
-
+// import {authMiddleware} from '../../../middleware/authMiddleware.js';
+import { 
+  authenticateUser,
+  restrictTo,
+  protect,
+  authLimiter } from '../../../middleware/authMiddleware.js';
 // =================== PUBLIC ROUTES =================== //
 router.get('/', serviceController.getAllServices); // Get all services
 router.get('/:id', serviceController.getService); // Get a single service by ID
@@ -21,7 +25,7 @@ router.get('/price-range/:minPrice/:maxPrice', serviceController.getServicesByPr
 router.get('/search/name/:name', serviceController.getServicesByName);
 
 // =================== PROTECTED ROUTES =================== //
-router.use(authMiddleware.protect);
+router.use(protect);
 
 // Admins & experts can create/update/delete
 // router.post('/', authMiddleware.restrictTo('admin', 'expert'), serviceController.createService);
@@ -39,7 +43,7 @@ router.get('/providers/all', serviceController.getAllServiceProviders);
 router.get('/provider/:id', serviceController.getServiceProvider);
 
 // --- Protected Service Routes ---
-router.use(authMiddleware.protect);
+router.use(protect);
 
 // Manage Service Providers
 router.post('/provider', serviceController.createServiceProvider);

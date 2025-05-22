@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import cookieParser from 'cookie-parser';
+ // Import rate limiting middleware
 import farmerRoutes from './routes/webRoutes/Farmers and Groups/farmerRoutes.js';
 import produceRoutes from './routes/webRoutes/Produce Products and Inputs/produceRoutes.js';
 import transporterRoutes from './routes/webRoutes/Services Management/transportRoutes.js';
@@ -21,11 +23,19 @@ import farmPlanRoutes from './routes/webRoutes/Farm Management/farmPlanRoutes.js
 import recordRoutes from './routes/webRoutes/Farm Management/recordRoutes.js';
 //Import USSD routes
 import ussdRoutes from './routes/ussdRoutes/cropManagementRoutesUSSD.js';
+import userRoutes from './routes/webRoutes/Users/userRoutes.js';
+
+
 dotenv.config();
 
 const app = express();
 app.use(express.json());
-app.use(cors());
+app.use(cookieParser());
+// app.use(cors());
+app.use(cors({
+  origin: 'http://localhost:8081', // Replace with the actual origin of your frontend
+  credentials: true, // Allow sending cookies or credentials
+}));
 
 app.use('/farmers', farmerRoutes);
 app.use('/produce', produceRoutes);
@@ -43,6 +53,7 @@ app.use('/groups', groupRoutes)
 app.use('/ussd', ussdRoutes);
 app.use('/crops', cropRoutes);
 app.use('/farm', farmPlanRoutes);
+app.use('/user', userRoutes);
 // app.use('/services', serviceRoutes);
 
 

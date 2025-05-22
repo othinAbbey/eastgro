@@ -98,7 +98,13 @@ import salesController from '../../../controllers/Sales and Purchases/salesContr
 import inPutsController from '../../../controllers/Produce Products and Inputs/inPutsController.js';
 import serviceTransactionController from '../../../controllers/Sales and Purchases/serviceTransactionController.js';
 // Auth middleware
-import authMiddleware from '../../../middleware/authMiddleware.js';
+// import authMiddleware from '../../../middleware/authMiddleware.js';
+import { 
+  authenticateUser,
+  restrictTo,
+  protect,
+  authLimiter 
+} from '../../../middleware/authMiddleware.js';
 
 
 // --- Market Routes ---
@@ -129,14 +135,14 @@ router.put('/inputs/:id', inPutsController.updateFarmInput);
 
 //---Transaction Routes---
 // --- Protected Booking Routes ---
-router.use(authMiddleware.protect);
+router.use(protect);
 
 // Book a service
 router.post('/book', serviceTransactionController.bookService);
 
 // Provider view: Bookings list
 router.get('/provider/:providerId/bookings',
-  authMiddleware.restrictTo('admin', 'expert'),
+  restrictTo('admin', 'expert'),
   serviceTransactionController.getProviderBookings
 );
 

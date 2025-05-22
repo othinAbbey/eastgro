@@ -2,20 +2,6 @@
 import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
-// Import the registerproduce function
-
-//Farm Inputs CRUD operations
-// const createFarmInput = async (req, res) => {
-//     try {
-//       const { name, type, quantity, unit } = req.body;
-//       const farmInput = await prisma.farmInput.create({
-//         data: { name, type, quantity, unit },
-//       });
-//       res.status(201).json(farmInput);
-//     } catch (error) {
-//       res.status(500).json({ error: error.message });
-//     }
-//   };
 const createFarmInput = async (req, res) => {
     try {
       const inputData = req.body;

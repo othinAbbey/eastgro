@@ -65,26 +65,6 @@ const getCustomerById = async (req, res) => {
   }
 };
 
-// const updateCustomer = async (req, res) => {
-//   const id = req.params.id;
-//   const { name, contact, purchaseHistory } = req.body;
-
-//   try {
-//     const updatedCustomer = await prisma.customer.update({
-//       where: { id: id },
-//       data: { name, contact, purchaseHistory },
-//     });
-
-//     res.status(200).json({
-//       message: 'Customer updated successfully',
-//       updatedCustomer,
-//     });
-//   } catch (err) {
-//     console.error('Error details:', err); // Log error for debugging
-//     res.status(400).send('Error updating customer');
-//   }
-// };
-
 const updateCustomer = async (req, res) => {
   const id = req.params.id;
   const { name, contact, purchaseHistory } = req.body;
@@ -104,7 +84,7 @@ const updateCustomer = async (req, res) => {
       return res.status(400).json({ message: "Name cannot be edited" });
     }
 
-    const updatedCustomer = await prisma.customer.update({
+const updatedCustomer = await prisma.customer.update({
       where: { id: id },
       data: { contact, purchaseHistory }, // Only update allowed fields
     });
@@ -119,5 +99,12 @@ const updateCustomer = async (req, res) => {
   }
 };
 
+const getAllCustomers = await prisma.user.findMany({
+  where: { role: 'CUSTOMER' },
+  select: { name: true, contact: true }
+}
+);
 
-export default { createCustomer, getCustomerById, updateCustomer };
+
+
+export default { createCustomer, getCustomerById, updateCustomer,getAllCustomers };
