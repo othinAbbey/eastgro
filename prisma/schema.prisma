@@ -120,6 +120,8 @@ model Produce {
   facilities     Facility[]       @relation("ProduceFacilities")
   products       Product[]        @relation("ProduceProducts")
   transactions   Transaction[]    @relation("TransactionProduce")
+
+  TraceabilityLog TraceabilityLog[]
 }
 
 model Storage {
@@ -212,7 +214,9 @@ model Farmer {
   password    String
   farmDetails String?
   //make farmer use roleenums
-  role        String  @default("FARMER")
+  // role        String  @default("FARMER")
+  // role UserRole @default(FARMER)
+
 
   groupId  String?
   group    Group?     @relation("GroupFarmers", fields: [groupId], references: [id])
@@ -220,6 +224,8 @@ model Farmer {
   problems Problem[]
   products Product[]  @relation("FarmerProducts")
   FarmPlan FarmPlan[]
+
+  Report Report[]
 }
 
 model Customer {
@@ -228,7 +234,9 @@ model Customer {
   contact         String   @unique
   password        String
   purchaseHistory String?
-  role            String   @default("customer")
+  // role            String   @default("customer")
+  // role UserRole @default(FARMER)
+
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -258,6 +266,9 @@ model Problem {
 
   farmer   Farmer            @relation(fields: [farmerId], references: [id])
   progress ProblemProgress[]
+  reportId String?
+  report   Report? @relation(fields: [reportId], references: [id])
+
 }
 
 model ProblemProgress {
@@ -272,11 +283,21 @@ model ProblemProgress {
 }
 
 // -------- Reports --------
+// model Report {
+//   id   String   @id @default(uuid())
+//   From DateTime
+//   To   DateTime
+// }
+
 model Report {
-  id   String   @id @default(uuid())
-  From DateTime
-  To   DateTime
+  id        String    @id @default(uuid())
+  startDate String
+  endDate   String
+  farmerId  String
+  farmer    Farmer    @relation(fields: [farmerId], references: [id])
+  problems  Problem[] // optional one-to-many
 }
+
 
 model FarmInput {
   id           String        @id @default(uuid())
@@ -309,6 +330,9 @@ model TraceabilityLog {
   timestamp  DateTime        @default(now())
 
   product Product @relation(fields: [productId], references: [id])
+  produceId String?
+  produce    Produce? @relation(fields: [produceId], references: [id])
+
 }
 
 // ================== SERVICE PROVIDERS ==================

@@ -33,7 +33,7 @@ const createFarmer = async (req, res) => {
         contact,
         password: hashedPassword,
         farmDetails,
-        role: 'farmer',
+        // role: 'farmer',
         location,
       },
     });
@@ -123,7 +123,7 @@ const updateFarmer = async (req, res) => {
     let farmerproduces = [];
     for (let produceName of produce) {
       // Use the registerproduce function to either create or get the produce
-      const produce = await registerproduce(produceName);
+      const produce = await createProduce(produceName);
 
       // Connect the produce to the farmer
       farmerproduces.push({ id: produce.id });
@@ -149,4 +149,7 @@ const updateFarmer = async (req, res) => {
   }
 };
 
-export default { createFarmer, getFarmerById, updateFarmer };
+
+
+
+export default { createFarmer, getFarmerById, updateFarmer};

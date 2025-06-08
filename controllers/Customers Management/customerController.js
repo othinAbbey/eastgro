@@ -107,4 +107,6 @@ const getAllCustomers = await prisma.user.findMany({
 
 
 
-export default { createCustomer, getCustomerById, updateCustomer,getAllCustomers };
+
+
+export default { createCustomer, getCustomerById, updateCustomer, getAllCustomers};

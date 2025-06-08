@@ -16,6 +16,8 @@ import cropRegisterRoutes from './routes/webRoutes/Crop Management/cropRegisterR
 import salesRoutes from './routes/webRoutes/Sales and Purchases/salesRoutes.js';
 import groupRoutes from './routes/webRoutes/Farmers and Groups/groupRoutes.js';
 import serviceRoutes from './routes/webRoutes/Services Management/serviceRoutes.js';
+import problemRoutes from './routes/webRoutes/Services Management/problemRoutes.js';
+
 import cropRoutes from './routes/webRoutes/Farm Management/cropRoutes.js';
 import farmActivityRoutes from './routes/webRoutes/Farm Management/farmActivityRoutes.js';
 import costRoutes from './routes/webRoutes/Farm Management/costRoutes.js';
@@ -55,8 +57,7 @@ app.use('/crops', cropRoutes);
 app.use('/farm', farmPlanRoutes);
 app.use('/user', userRoutes);
 // app.use('/services', serviceRoutes);
-
-
+app.use('/problems', problemRoutes);
 app.get('/', (req, res) => {
   res.send('Food Traceability API is running');
 });

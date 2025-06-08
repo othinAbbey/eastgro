@@ -136,8 +136,8 @@ const protect = (req, res, next) => {
 };
 
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10,
+  windowMs: 150 * 600 * 10000, // 15 minutes
+  max: 100,
   message: 'Too many attempts. Try again later.'
 });
 

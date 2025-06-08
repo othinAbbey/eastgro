@@ -108,7 +108,7 @@ import {
 
 
 // --- Market Routes ---
-router.get('/listings', salesController.getMarketListings);
+router.get('/market/listings', salesController.getMarketListings);
 router.post('/group', salesController.groupFarmersByCrop);
 router.post('/offer', salesController.placeOffer);
 router.get('/transactions/:userId', salesController.getTransactionHistory);
@@ -145,5 +145,10 @@ router.get('/provider/:providerId/bookings',
   restrictTo('admin', 'expert'),
   serviceTransactionController.getProviderBookings
 );
+
+// Get farmer transactions
+router.get('/farmer/:id/transactions', salesController.getfarmerTransactions);
+// Get Customer transactions
+router.get('/customer/:id/transactions', salesController.getTransactionsByCustomerId);
 
 export default router;

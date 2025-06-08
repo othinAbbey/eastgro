@@ -8,8 +8,8 @@ dotenv.config();
 
 const prisma = new PrismaClient();
 const SALT_ROUNDS = 10;
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
+const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN;
 
 // Helper function to exclude fields from user object
 function exclude(user, keys) {
@@ -93,15 +93,15 @@ const register = async(req, res)=> {
 // User login
 const login = async(req, res) => {
   try {
-    const { email, password } = req.body;
+    const { contact, password } = req.body;
 
-    if (!email || !password) {
+    if (!contact || !password) {
       return res.status(400).json({ 
-        error: 'Email and password are required' 
+        error: 'Contact and password are required' 
       });
     }
 
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({ where: { contact } });
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -116,13 +116,20 @@ const login = async(req, res) => {
       JWT_SECRET, 
       { expiresIn: JWT_EXPIRES_IN }
     );
+    //Respond to cookies with token
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV,
+      sameSite: 'Strict',
+      maxAge: JWT_EXPIRES_IN,
+    });
 
     const userWithoutPassword = exclude(user, ['password']);
 
     return res.json({
       message: 'Login successful',
       user: userWithoutPassword,
-      token
+      // token
     });
 
   } catch (error) {
@@ -296,73 +303,7 @@ const getAllUsers= async(req, res)=> {
     return res.status(500).json({ error: 'Failed to get users' });
   }
 }
-
-// Admin: Get user by ID
-// async function getUserById(req, res) {
-//   try {
-//     // Check if user is admin
-//     if (req.user.role !== UserRole.ADMIN) {
-//       return res.status(403).json({ error: 'Unauthorized' });
-//     }
-
-//     const userId = req.params.id;
-//     const user = await prisma.user.findUnique({
-//       where: { id: userId },
-//       select: {
-//         id: true,
-//         name: true,
-//         contact: true,
-//         email: true,
-//         role: true,
-//         createdAt: true,
-//         updatedAt: true
-//       }
-//     });
-
-//     if (!user) {
-//       return res.status(404).json({ error: 'User not found' });
-//     }
-
-//     return res.json(user);
-//   } catch (error) {
-//     console.error('Get user by ID error:', error);
-//     return res.status(500).json({ error: 'Failed to get user' });
-//   }
-// }
-// Admin: Get user by ID
-// const getUserById = async(req, res)=> {
-//   try {
-//     // Only admins can access this
-//     if (req.user.role !== UserRole.ADMIN) {
-//       return res.status(403).json({ error: 'Unauthorized' });
-//     }
-
-//     const userId = req.params.id;
-
-//     const user = await prisma.user.findUnique({
-//       where: { id: userId },
-//       select: {
-//         id: true,
-//         name: true,
-//         contact: true,
-//         email: true,
-//         role: true,
-//         createdAt: true,
-//         updatedAt: true
-//       }
-//     });
-
-//     if (!user) {
-//       return res.status(404).json({ error: 'User not found' });
-//     }
-
-//     return res.json({ user });
-//   } catch (error) {
-//     console.error('Get user by ID error:', error);
-//     return res.status(500).json({ error: 'Failed to get user' });
-//   }
-// }
-
+// Admin: Get User by ID
 const getUserById = async (req, res) => {
   try {
     if (req.user.role !== UserRole.ADMIN) {
