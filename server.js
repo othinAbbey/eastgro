@@ -35,7 +35,7 @@ app.use(express.json());
 app.use(cookieParser());
 // app.use(cors());
 app.use(cors({
-  origin: 'http://localhost:8081', // Replace with the actual origin of your frontend
+  origin: ['http://localhost:8081','https://eastgro.onrender.com'], // Replace with the actual origin of your frontend
   credentials: true, // Allow sending cookies or credentials
 }));
 
