@@ -99,11 +99,24 @@ const updatedCustomer = await prisma.customer.update({
   }
 };
 
-const getAllCustomers = await prisma.user.findMany({
-  where: { UserRole: 'CUSTOMER' },
-  select: { name: true, contact: true }
-}
-);
+const getAllCustomers = async () => {
+  try {
+    const customers = await prisma.user.findMany({
+      where: {
+        UserRole: 'CUSTOMER',
+      },
+      select: {
+        name: true,
+        contact: true,
+      },
+    });
+
+    return customers;
+  } catch (error) {
+    console.error('Error fetching customers:', error);
+    throw new Error('Failed to fetch customers');
+  }
+};
 
 
 
