@@ -34,9 +34,15 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser());
 // app.use(cors());
+// app.use(cors({
+//   origin: 'https://eastgro.onrender.com', // Replace with the actual origin of your frontend
+//   credentials: true, // Allow sending cookies or credentials
+// }));
 app.use(cors({
-  origin: ['http://localhost:8081','https://eastgro.onrender.com'], // Replace with the actual origin of your frontend
-  credentials: true, // Allow sending cookies or credentials
+  origin: (origin, callback) => {
+    callback(null, origin); // Reflect request origin
+  },
+  credentials: true,
 }));
 
 app.use('/farmers', farmerRoutes);
