@@ -317,7 +317,7 @@ model User {
   contact   String   @unique
   email     String   @unique
   password  String
-  role      UserRole @default(FARMER)
+  UserRole  String   @default("CUSTOMER") 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

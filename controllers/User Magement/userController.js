@@ -23,7 +23,7 @@ function exclude(user, keys) {
 // Register a new user
 const register = async(req, res)=> {
   try {
-    const { name, contact, email, password, role } = req.body;
+    const { name, contact, email, password, UserRole } = req.body;
 
     // Validate input
     if (!name || !contact || !email || !password) {
@@ -62,7 +62,7 @@ const register = async(req, res)=> {
         contact,
         email,
         password: hashedPassword,
-        role
+        UserRole
       }
     });
 
