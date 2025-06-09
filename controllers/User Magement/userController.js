@@ -62,7 +62,7 @@ const register = async(req, res)=> {
         contact,
         email,
         password: hashedPassword,
-        UserRole
+        UserRole: UserRole// Default to CUSTOMER if no role provided
       }
     });
 
