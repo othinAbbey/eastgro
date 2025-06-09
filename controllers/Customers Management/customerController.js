@@ -100,7 +100,7 @@ const updatedCustomer = await prisma.customer.update({
 };
 
 const getAllCustomers = await prisma.user.findMany({
-  where: { role: 'CUSTOMER' },
+  where: { UserRole: 'CUSTOMER' },
   select: { name: true, contact: true }
 }
 );
