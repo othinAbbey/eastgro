@@ -62,7 +62,7 @@ const register = async(req, res)=> {
         contact,
         email,
         password: hashedPassword,
-        role: role || UserRole.FARMER
+        UserRole
       }
     });
 
