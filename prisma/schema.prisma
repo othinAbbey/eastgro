@@ -226,6 +226,8 @@ model Farmer {
   FarmPlan FarmPlan[]
 
   Report Report[]
+
+  Weather Weather[]
 }
 
 model Customer {
@@ -606,4 +608,21 @@ model FarmRecord {
   createdAt  DateTime @default(now())
 
   farmPlan FarmPlan @relation(fields: [farmPlanId], references: [id])
+}
+model Weather {
+  id          Int      @id @default(autoincrement())
+  farmerId    String?     
+  location    String
+  temperature Float
+  humidity    Float
+  windSpeed   Float
+  conditions  String
+  description String
+  icon        String
+  timestamp   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Optional: if you have a Farmer model
+  Farmer Farmer? @relation(fields: [farmerId], references: [id])
 }

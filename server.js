@@ -26,7 +26,7 @@ import recordRoutes from './routes/webRoutes/Farm Management/recordRoutes.js';
 //Import USSD routes
 import ussdRoutes from './routes/ussdRoutes/cropManagementRoutesUSSD.js';
 import userRoutes from './routes/webRoutes/Users/userRoutes.js';
-
+import weatherRoutes from './routes/weatherRoutes.js';
 
 dotenv.config();
 
@@ -67,6 +67,9 @@ app.use('/problems', problemRoutes);
 app.get('/', (req, res) => {
   res.send('Food Traceability API is running');
 });
+
+// Use the weather routes
+app.use('/weather', weatherRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
