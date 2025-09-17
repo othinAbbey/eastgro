@@ -285,11 +285,6 @@ model ProblemProgress {
 }
 
 // -------- Reports --------
-// model Report {
-//   id   String   @id @default(uuid())
-//   From DateTime
-//   To   DateTime
-// }
 
 model Report {
   id        String    @id @default(uuid())
@@ -366,20 +361,7 @@ model ServiceProvider {
   transactions Transaction[] @relation("ServiceProviderTransactions")
 }
 
-// model ServiceOffering {
-//   id                String  @id @default(uuid())
-//   serviceId         String
-//   serviceProviderId String
-//   rate              Float // Custom rate for this provider (can differ from base price)
-//   minQuantity       Int?    @default(1) // Minimum quantity required
-//   unit              String  @default("session")
-//   notes             String? // Any special notes about this service
-//   isActive          Boolean @default(true)
 
-//   // Relations
-//   service         Service         @relation(fields: [serviceId], references: [id])
-//   serviceProvider ServiceProvider @relation(fields: [serviceProviderId], references: [id])
-// }
 
 model ServiceOfferings {
   id                String  @id @default(uuid())
@@ -416,25 +398,7 @@ model Service {
   transactions Transaction[] @relation("TransactionServices")
 }
 
-// Update Transaction model to include service provider
-// model Transaction {
-//   id            String @id @default(uuid())
-//   buyerId       String
-//   totalAmount   Int
-//   paymentMethod String @default("CASH")
-//   status        String @default("PENDING")
 
-//   // Add service provider reference
-//   serviceProviderId String?
-//   serviceProvider   ServiceProvider? @relation(fields: [serviceProviderId], references: [id], name: "ServiceProviderTransactions")
-
-//   // Existing relations
-//   buyer     Customer    @relation(fields: [buyerId], references: [id])
-//   products  Product[]   @relation("TransactionProducts")
-//   produce   Produce[]   @relation("TransactionProduce")
-//   services  Service[]   @relation("TransactionServices")
-//   FarmInput FarmInput[] @relation("TransactionInputs")
-// }
 
 model Transaction {
   id            String @id @default(uuid())
@@ -555,15 +519,7 @@ model FarmPlan {
   records    FarmRecord[]
 }
 
-// model CostTemplate {
-//   id       String   @id @default(uuid())
-//   costName String
-//   type     CostType
-//   stage    Stage
-//   amount   Float
-//   cropId   String
-//   crop     Crop     @relation(fields: [cropId], references: [id])
-// }
+
 model CostTemplate {
   id          String   @id @default(uuid())
   cropId      String

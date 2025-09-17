@@ -32,6 +32,28 @@ dotenv.config();
 
 const app = express();
 app.use(express.json());
+// Middleware to parse JSON bodies
+// This will throw an error if the JSON is malformed
+// app.use(express.json({
+//   strict: true,
+//   verify: (req, res, buf, encoding) => {
+//     if (buf.length === 0) return;
+//     try {
+//       JSON.parse(buf.toString(encoding));
+//     } catch (e) {
+//       throw new Error('Invalid JSON');
+//     }
+//   }
+// }));
+
+// // Add a global error handler to catch that "Invalid JSON"
+// app.use((err, req, res, next) => {
+//   if (err.message === 'Invalid JSON') {
+//     return res.status(400).json({ error: 'Malformed JSON in request body' });
+//   }
+//   next(err);
+// });
+
 app.use(cookieParser());
 // app.use(cors());
 // app.use(cors({

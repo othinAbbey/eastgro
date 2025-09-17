@@ -5,95 +5,110 @@ import SMSService from '../../utils/smsService.js';
 import cache from '../../utils/cache.js';
 import { Op } from 'sequelize';
 
-const WEATHER_API_KEY = process.env.WEATHER_API_KEY || 'your_api_key';
-const WEATHER_BASE_URL = process.env.WEATHER_BASE_URL || 'https://api.openweathermap.org/data/2.5/weather';
-
-const getCurrentWeather = async (req, res) => {
-  try {
-      const { lat, lon } = req.query;
-    //   let location = queryLocation;
-      
-      console.log(lat, lon);
-    // If lat/lon is provided, use it directly for weather fetch
-    if (lat && lon) {
-      const response = await axios.get(WEATHER_BASE_URL, {
-        params: {
-          lat,
-          lon,
-          appid: WEATHER_API_KEY,
-          units: 'metric'
-        }
-      });
-
-      location = response.data.name; // fallback for caching
-      const cacheKey = `weather_${lat}_${lon}`;
-      const weatherData = {
-        location: response.data.name,
-        temperature: response.data.main.temp,
-        humidity: response.data.main.humidity,
-        windSpeed: response.data.wind.speed,
-        conditions: response.data.weather[0].main,
-        description: response.data.weather[0].description,
-        icon: `https://openweathermap.org/img/wn/${response.data.weather[0].icon}@2x.png`,
-        timestamp: new Date(response.data.dt * 1000)
-      };
-
-      cache.set(cacheKey, weatherData, 1800); // 30 mins cache
-      return res.json(weatherData);
-    }
-
-    // If no lat/lon, fall back to location string (e.g. "Kampala")
-    if (!location) {
-      return res.status(400).json({ error: 'Please provide lat/lon or location name' });
-    }
-
-    const validationResult = validateLocation({ location });
-    if (validationResult.error) {
-      return res.status(400).json({ error: validationResult.error.details[0].message });
-    }
-
-    const cacheKey = `weather_${location}`;
-    const cachedData = cache.get(cacheKey);
-    if (cachedData) {
-      return res.json(cachedData);
-    }
-
-    const response = await axios.get(WEATHER_BASE_URL, {
-      params: {
-        q: location,
-        appid: WEATHER_API_KEY,
-        units: 'metric'
-      }
-    });
-
-    const weatherData = {
-      location: response.data.name,
-      temperature: response.data.main.temp,
-      humidity: response.data.main.humidity,
-      windSpeed: response.data.wind.speed,
-      conditions: response.data.weather[0].main,
-      description: response.data.weather[0].description,
-      icon: `https://openweathermap.org/img/wn/${response.data.weather[0].icon}@2x.png`,
-      timestamp: new Date(response.data.dt * 1000)
-    };
-
-    cache.set(cacheKey, weatherData, 1800); // 30 mins
-    res.json(weatherData);
-
-  } catch (error) {
-    console.error('Weather API error:', error.message);
-    res.status(500).json({ error: 'Failed to fetch weather data', details: error.message });
-  }
-};
-
-// [Keep other functions unchanged...]
-
-
 /**
  * @desc Get weather forecast
  * @route GET /api/weather/forecast
  * @access Public
  */
+
+const WEATHER_API_KEY = process.env.WEATHER_API_KEY;
+const WEATHER_API_URL = process.env.WEATHER_API_URL;
+const CLIMATE_API_URL = process.env.CLIMATE_API_URL;
+
+
+const getCurrentWeather = async (req, res) => {
+  try {
+    const { lat, lon } = req.query;
+
+    // ✅ Log incoming query parameters
+    console.log("📍 Latitude:", lat, "Longitude:", lon);
+
+    // ✅ Validate presence
+    if (!lat || !lon) {
+      return res.status(400).json({ error: "Latitude and longitude are required in query params" });
+    }
+
+    // ✅ Convert and validate types
+    const latNum = parseFloat(lat);
+    const lonNum = parseFloat(lon);
+    if (isNaN(latNum) || isNaN(lonNum)) {
+      return res.status(400).json({ error: "Latitude and longitude must be valid numbers" });
+    }
+
+    // ✅ Check cache
+    const cacheKey = `weather_${lat}_${lon}`;
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      console.log("✅ Serving from cache");
+      return res.json(cached);
+    }
+
+    // ✅ Make API request to OpenWeather
+    const response = await axios.get(WEATHER_API_URL, {
+      params: {
+        lat: latNum,
+        lon: lonNum,
+        appid: WEATHER_API_KEY,
+        units: 'metric',
+      },
+    });
+
+    const data = response.data;
+
+    // ✅ Build weather data
+    const weatherData = {
+      location: data.name || "Unknown",
+      temperature: data.main?.temp,
+      humidity: data.main?.humidity,
+      windSpeed: data.wind?.speed,
+      conditions: data.weather?.[0]?.main,
+      description: data.weather?.[0]?.description,
+      icon: `https://openweathermap.org/img/wn/${data.weather?.[0]?.icon}@2x.png`,
+      timestamp: new Date(data.dt * 1000),
+    };
+
+    // ✅ Cache and return
+    cache.set(cacheKey, weatherData, 1800); // 30 min
+    console.log("🆕 New weather data cached");
+    // ✅ Return response
+    console.log("🌤️ Current weather data:", weatherData);
+    return res.json(weatherData);
+  } catch (error) {
+    console.error("❌ Weather API error:", error?.response?.data || error.message);
+    return res.status(500).json({
+      error: "Failed to fetch weather data",
+      details: error?.message,
+    });
+  }
+};
+
+//get climate change data
+const getClimateChangeData = async (req, res) => {
+  try {
+    // Placeholder for climate change data retrieval logic
+    // This could involve fetching from a different API or database
+   const response = await axios.get(CLIMATE_API_URL);
+   const climateData = response.data;
+
+        // Process and format the data as needed
+        const formattedData = climateData.map(item => ({
+          date: item.date,
+          temperature: item.temperature,
+          co2Levels: item.co2Levels,
+          seaLevelRise: item.seaLevelRise,
+          description: item.description
+        }));
+
+        // Cache the data if needed
+        cache.set('climate_change_data', formattedData, 3600); // Cache for 1 hour
+
+        res.json(formattedData);
+  } catch (error) {
+    console.error('Climate change data error:', error);
+    res.status(500).json({ error: 'Failed to fetch climate change data' });
+  }
+};
+
 const getWeatherForecast = async (req, res) => {
   try {
     const { location, days = 3 } = req.query;
@@ -107,7 +122,7 @@ const getWeatherForecast = async (req, res) => {
     const cachedData = _get(cacheKey);
     if (cachedData) return res.json(cachedData);
 
-    const response = await get(`${WEATHER_BASE_URL}/forecast/daily`, {
+    const response = await get(`${WEATHER_API_URL}/forecast/daily`, {
       params: {
         q: location,
         cnt: days,
@@ -231,5 +246,6 @@ export {
   getWeatherForecast,
   getWeatherAlerts,
   subscribeToAlerts,
-  getWeatherHistory
+  getWeatherHistory,
+  getClimateChangeData
 };
