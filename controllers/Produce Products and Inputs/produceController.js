@@ -1,7 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
-const createProduce = async (rgit eq, res) => {
+const createProduce = async (req, res) => {
   try {
     const { farmerId, type, quantity, harvestDate, qualityReport } = req.body;
     const produce = await prisma.produce.create({
