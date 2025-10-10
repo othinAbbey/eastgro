@@ -6,4 +6,4 @@
 */
 -- AlterTable
 ALTER TABLE "User" DROP COLUMN "role",
-ADD COLUMN     "UserRole" TEXT;
+ADD COLUMN     "userRole" TEXT;

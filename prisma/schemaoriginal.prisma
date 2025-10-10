@@ -213,6 +213,10 @@ model Farmer {
   location    String
   password    String
   farmDetails String?
+  //make farmer use roleenums
+  // role        String  @default("FARMER")
+  // role userRole @default(FARMER)
+
 
   groupId  String?
   group    Group?     @relation("GroupFarmers", fields: [groupId], references: [id])
@@ -232,6 +236,8 @@ model Customer {
   contact         String   @unique
   password        String
   purchaseHistory String?
+  // role            String   @default("customer")
+  // role userRole @default(FARMER)
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -303,19 +309,15 @@ model FarmInput {
 
 // -------- Users Table --------
 model User {
-  id          String        @id @default(uuid())
-  name        String
-  contact     String        @unique
-  email       String        @unique
-  password    String
-  userRole    String        @default("GUEST")
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-
-  // Relations
-  investments Investment[]
+  id        String   @id @default(uuid())
+  name      String
+  contact   String   @unique
+  email     String   @unique
+  password  String
+  userRole  String   @default("CUSTOMER") 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
-
 
 // -------- Traceability Logs --------
 model TraceabilityLog {
@@ -563,7 +565,6 @@ model FarmRecord {
 
   farmPlan FarmPlan @relation(fields: [farmPlanId], references: [id])
 }
-
 model Weather {
   id          Int      @id @default(autoincrement())
   farmerId    String?     
@@ -581,95 +582,3 @@ model Weather {
   // Optional: if you have a Farmer model
   Farmer Farmer? @relation(fields: [farmerId], references: [id])
 }
-
-/// INVESTMENTCOSTS
-// ================== INVESTMENT MODELS ==================
-enum InvestmentStatus {
-  ACTIVE
-  COMPLETED
-  CANCELLED
-  PENDING
-}
-
-enum PayoutStatus {
-  PENDING
-  PAID
-  FAILED
-  PROCESSING
-}
-
-model Investment {
-  id                String         @id @default(uuid())
-  investorId        String
-  initialAmount     Float
-  currentBalance    Float
-  monthlyReturnRate Float         @default(7.1) // 7.1% default return
-  totalEarned       Float         @default(0)
-  status            InvestmentStatus @default(ACTIVE)
-  startDate         DateTime      @default(now())
-  endDate           DateTime?
-  nextPayoutDate    DateTime
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-
-  // Relations
-  investor     User           @relation(fields: [investorId], references: [id])
-  payouts      Payout[]
-  transactions InvestmentTransaction[]
-  inventory    InvestmentInventory[]
-}
-
-model Payout {
-  id            String       @id @default(uuid())
-  investmentId  String
-  amount        Float
-  status        PayoutStatus @default(PENDING)
-  scheduledDate DateTime
-  paidDate      DateTime?
-  createdAt     DateTime     @default(now())
-
-  investment Investment @relation(fields: [investmentId], references: [id])
-}
-
-model InvestmentTransaction {
-  id            String   @id @default(uuid())
-  investmentId  String
-  type          String   // 'investment', 'payout', 'sale', 'expense'
-  amount        Float
-  description   String
-  status        String   @default("completed")
-  date          DateTime @default(now())
-
-  investment Investment @relation(fields: [investmentId], references: [id])
-}
-
-model InvestmentInventory {
-  id               String   @id @default(uuid())
-  investmentId     String
-  productType      String   @default("Rice")
-  totalPurchased   Int      // in kg
-  sold             Int      @default(0)
-  remaining        Int
-  averageBuyPrice  Float
-  currentMarketPrice Float
-  currentValue     Float
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  investment Investment @relation(fields: [investmentId], references: [id])
-  sales      InvestmentSale[]
-}
-
-model InvestmentSale {
-  id           String   @id @default(uuid())
-  inventoryId  String
-  date         DateTime @default(now())
-  quantity     Int
-  pricePerUnit Float
-  totalAmount  Float
-  buyer        String
-
-  inventory InvestmentInventory @relation(fields: [inventoryId], references: [id])
-}
-
-

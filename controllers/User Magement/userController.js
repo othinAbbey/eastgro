@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
-import { UserRole } from '@prisma/client';
+import { userRole } from '@prisma/client';
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -23,7 +23,7 @@ function exclude(user, keys) {
 // Register a new user
 const register = async(req, res)=> {
   try {
-    const { name, contact, email, password, UserRole } = req.body;
+    const { name, contact, email, password, userRole } = req.body;
 
     // Validate input
     if (!name || !contact || !email || !password) {
@@ -62,7 +62,7 @@ const register = async(req, res)=> {
         contact,
         email,
         password: hashedPassword,
-        UserRole
+        userRole
       }
     });
 
@@ -265,7 +265,7 @@ const newPassword = async (req, res) =>{
 const getAllUsers= async(req, res)=> {
   try {
     // Check if user is admin
-    if (req.user.role !== UserRole.ADMIN) {
+    if (req.user.role !== userRole.ADMIN) {
       return res.status(403).json({ error: 'Unauthorized' });
     }
 
@@ -306,7 +306,7 @@ const getAllUsers= async(req, res)=> {
 // Admin: Get User by ID
 const getUserById = async (req, res) => {
   try {
-    if (req.user.role !== UserRole.ADMIN) {
+    if (req.user.role !== userRole.ADMIN) {
       return res.status(403).json({ error: 'Unauthorized' });
     }
 
@@ -338,14 +338,14 @@ const getUserById = async (req, res) => {
 const updatedUser =  async (req, res)=> {
   try {
     // Check if user is admin
-    if (req.user.role !== UserRole.ADMIN) {
+    if (req.user.role !== userRole.ADMIN) {
       return res.status(403).json({ error: 'Unauthorized' });
     }
 
     const userId = req.params.id;
     const { role } = req.body;
 
-    if (!Object.values(UserRole).includes(role)) {
+    if (!Object.values(userRole).includes(role)) {
       return res.status(400).json({ error: 'Invalid role' });
     }
 
@@ -375,7 +375,7 @@ const updatedUser =  async (req, res)=> {
 const deleteUser = async (req, res)=> {
   try {
     // Check if user is admin
-    if (req.user.role !== UserRole.ADMIN) {
+    if (req.user.role !== userRole.ADMIN) {
       return res.status(403).json({ error: 'Unauthorized' });
     }
 
@@ -473,7 +473,7 @@ const getUsersByRole = async (req, res) =>{
     const skip = (page - 1) * limit;
 
     // Validate role
-    if (!Object.values(UserRole).includes(role)) {
+    if (!Object.values(userRole).includes(role)) {
       return res.status(400).json({ error: 'Invalid role' });
     }
 
@@ -517,7 +517,7 @@ const getUsersByRole = async (req, res) =>{
 const countUsersByRole = async (req, res)=> {
   try {
     const counts = await Promise.all(
-      Object.values(UserRole).map(async (role) => {
+      Object.values(userRole).map(async (role) => {
         const count = await prisma.user.count({ where: { role } });
         return { role, count };
       })
@@ -540,7 +540,7 @@ const searchUsersByRole = async (req, res)=> {
     const skip = (page - 1) * limit;
 
     // Validate role
-    if (!Object.values(UserRole).includes(role)) {
+    if (!Object.values(userRole).includes(role)) {
       return res.status(400).json({ error: 'Invalid role' });
     }
 

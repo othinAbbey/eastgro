@@ -103,7 +103,7 @@ const getAllCustomers = async () => {
   try {
     const customers = await prisma.user.findMany({
       where: {
-        UserRole: 'CUSTOMER',
+        userRole: 'CUSTOMER',
       },
       select: {
         name: true,

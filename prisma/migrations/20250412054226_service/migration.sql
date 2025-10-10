@@ -14,7 +14,7 @@ CREATE TABLE "ServiceProvider" (
     "region" TEXT NOT NULL DEFAULT 'Eastern',
     "rating" DOUBLE PRECISION DEFAULT 0.0,
     "isVerified" BOOLEAN NOT NULL DEFAULT false,
-    "role" "UserRole" NOT NULL DEFAULT 'EXPERT',
+    "role" "userRole" NOT NULL DEFAULT 'EXPERT',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "qualifications" TEXT[],

@@ -28,6 +28,9 @@ import ussdRoutes from './routes/ussdRoutes/cropManagementRoutesUSSD.js';
 import userRoutes from './routes/webRoutes/Users/userRoutes.js';
 import weatherRoutes from './routes/weatherRoutes.js';
 
+//Investment routes
+import investmentRoutes from './routes/webRoutes/Investment Route/investmentRoutes.js';
+
 dotenv.config();
 
 const app = express();
@@ -84,6 +87,7 @@ app.use('/ussd', ussdRoutes);
 app.use('/crops', cropRoutes);
 app.use('/farm', farmPlanRoutes);
 app.use('/user', userRoutes);
+app.use('/investments', investmentRoutes);
 // app.use('/services', serviceRoutes);
 app.use('/problems', problemRoutes);
 app.get('/', (req, res) => {
