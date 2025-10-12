@@ -1,5 +1,518 @@
-///----------Organised------------------
-// ========================= ENUMS =========================
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Product {
+  id                  String            @id @default(uuid())
+  name                String
+  price               Int
+  quantity            Int
+  createdAt           DateTime          @default(now())
+  transporterId       String?
+  unit                String            @default("Kgs")
+  marketListings      MarketListing[]
+  transporter         Transporter?      @relation(fields: [transporterId], references: [id])
+  TraceabilityLog     TraceabilityLog[]
+  Processing_Facility Facility[]        @relation("FacilityProducts")
+  farmer              Farmer[]          @relation("FarmerProducts")
+  produce             Produce[]         @relation("ProduceProducts")
+  QR_code             QRCode[]          @relation("QRCodeProducts")
+  shipment            Shipment[]        @relation("ShipmentProducts")
+  transactions        Transaction[]     @relation("TransactionProducts")
+}
+
+model MarketListing {
+  id          String   @id @default(uuid())
+  productId   String
+  sellerId    String
+  sellerType  String
+  price       Int
+  quantity    Int
+  location    String
+  isAvailable Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  product     Product  @relation(fields: [productId], references: [id])
+}
+
+model Produce {
+  id              String            @id @default(uuid())
+  farmerId        String?
+  type            String
+  region          String            @default("Eastern")
+  quantity        Int
+  harvestDate     DateTime
+  qualityReport   QualityGrade?
+  status          ProduceStatus     @default(HARVESTED)
+  isBiofortified  Boolean           @default(false)
+  createdAt       DateTime          @default(now())
+  price           Int               @default(0)
+  unit            String            @default("kgs")
+  farmer          Farmer?           @relation(fields: [farmerId], references: [id])
+  qrCode          QRCode?
+  shipments       Shipment[]
+  storage         Storage?
+  TraceabilityLog TraceabilityLog[]
+  loadAtFacility  loadAtFacility[]
+  facilities      Facility[]        @relation("ProduceFacilities")
+  products        Product[]         @relation("ProduceProducts")
+  transactions    Transaction[]     @relation("TransactionProduce")
+}
+
+model Storage {
+  id         String     @id @default(uuid())
+  facilityId String
+  produceId  String     @unique
+  quantity   Int
+  storedAt   DateTime   @default(now())
+  shipments  Shipment[]
+  facility   Facility   @relation(fields: [facilityId], references: [id])
+  produce    Produce    @relation(fields: [produceId], references: [id])
+}
+
+model loadAtFacility {
+  id         String     @id @default(uuid())
+  facilityId String
+  produceId  String
+  quantity   Int
+  loadedAt   DateTime   @default(now())
+  facility   Facility   @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  produce    Produce    @relation(fields: [produceId], references: [id])
+  shipments  Shipment[] @relation("ShipmentToloadAtFacility")
+}
+
+model QRCode {
+  id          String    @id @default(uuid())
+  produceId   String    @unique
+  generatedAt DateTime  @default(now())
+  scannedAt   DateTime?
+  produce     Produce   @relation(fields: [produceId], references: [id])
+  products    Product[] @relation("QRCodeProducts")
+}
+
+model Shipment {
+  id             String           @id @default(uuid())
+  produceId      String
+  transporterId  String?
+  facilityId     String?
+  storageId      String?
+  destination    String
+  status         ShipmentStatus   @default(PENDING)
+  deliveryDate   DateTime?
+  facility       Facility?        @relation(fields: [facilityId], references: [id])
+  produce        Produce          @relation(fields: [produceId], references: [id])
+  storage        Storage?         @relation(fields: [storageId], references: [id])
+  transporter    Transporter?     @relation(fields: [transporterId], references: [id])
+  products       Product[]        @relation("ShipmentProducts")
+  loadAtFacility loadAtFacility[] @relation("ShipmentToloadAtFacility")
+}
+
+model Transporter {
+  id             String     @id @default(uuid())
+  name           String
+  vehicleDetails String?
+  contact        String
+  status         String
+  Region         String
+  products       Product[]
+  shipments      Shipment[]
+}
+
+model Facility {
+  id                String           @id @default(uuid())
+  name              String
+  location          String
+  processingDetails String?
+  workload          Int              @default(0)
+  shipments         Shipment[]
+  storage           Storage[]
+  loads             loadAtFacility[]
+  products          Product[]        @relation("FacilityProducts")
+  producesHandled   Produce[]        @relation("ProduceFacilities")
+}
+
+model Farmer {
+  id          String     @id @default(uuid())
+  name        String
+  contact     String     @unique
+  location    String
+  password    String
+  farmDetails String?
+  groupId     String?
+  FarmPlan    FarmPlan[]
+  group       Group?     @relation("GroupFarmers", fields: [groupId], references: [id])
+  problems    Problem[]
+  produce     Produce[]
+  Report      Report[]
+  Weather     Weather[]
+  products    Product[]  @relation("FarmerProducts")
+}
+
+model Customer {
+  id              String        @id @default(uuid())
+  name            String
+  password        String
+  contact         String        @unique
+  purchaseHistory String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  transactions    Transaction[]
+}
+
+model Group {
+  id            String   @id @default(uuid())
+  cropType      String
+  totalQuantity Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  region        String
+  farmers       Farmer[] @relation("GroupFarmers")
+}
+
+model Problem {
+  id       String            @id @default(uuid())
+  farmtype String
+  farmerId String
+  Crop     String
+  Disease  String
+  Pest     String
+  reportId String?
+  farmer   Farmer            @relation(fields: [farmerId], references: [id])
+  report   Report?           @relation(fields: [reportId], references: [id])
+  progress ProblemProgress[]
+}
+
+model ProblemProgress {
+  id        String        @id @default(uuid())
+  problemId String
+  update    String
+  updatedBy String
+  status    ProblemStatus @default(REPORTED)
+  updatedAt DateTime      @default(now())
+  problem   Problem       @relation(fields: [problemId], references: [id])
+}
+
+model Report {
+  id        String    @id @default(uuid())
+  endDate   String
+  farmerId  String
+  startDate String
+  problems  Problem[]
+  farmer    Farmer    @relation(fields: [farmerId], references: [id])
+}
+
+model FarmInput {
+  id           String        @id @default(uuid())
+  name         String
+  type         String
+  quantity     Int
+  unit         String
+  createdAt    DateTime      @default(now())
+  price        Int           @default(0)
+  transactions Transaction[] @relation("TransactionInputs")
+}
+
+model User {
+  id         String       @id @default(cuid())
+  name       String
+  email      String       @unique
+  contact    String       @unique
+  password   String
+  userRole   UserRole
+  location   String?
+  district   String?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  Investment Investment[]
+
+  @@map("users")
+}
+
+model TraceabilityLog {
+  id         String          @id @default(uuid())
+  actionType TraceActionType
+  productId  String
+  timestamp  DateTime        @default(now())
+  produceId  String?
+  produce    Produce?        @relation(fields: [produceId], references: [id])
+  product    Product         @relation(fields: [productId], references: [id])
+}
+
+model ServiceProvider {
+  id              String             @id @default(uuid())
+  name            String
+  contact         String             @unique
+  email           String             @unique
+  password        String
+  businessName    String
+  description     String?
+  location        String
+  region          String             @default("Eastern")
+  rating          Float?             @default(0.0)
+  isVerified      Boolean            @default(false)
+  createdAt       DateTime           @default(now())
+  availability    String             @default("Monday-Friday, 8AM-5PM")
+  equipment       String[]
+  minOrderAmount  Float?
+  profileImage    String?
+  qualifications  String[]
+  travelRadius    Int?
+  role            UserRole           @default(EXPERT)
+  servicesOffered ServiceOfferings[]
+  transactions    Transaction[]      @relation("ServiceProviderTransactions")
+}
+
+model ServiceOfferings {
+  id                String          @id @default(uuid())
+  serviceId         String
+  serviceProviderId String
+  rate              Float
+  minQuantity       Int?            @default(1)
+  unit              String          @default("session")
+  notes             String?
+  isActive          Boolean         @default(true)
+  service           Service         @relation(fields: [serviceId], references: [id])
+  serviceProvider   ServiceProvider @relation(fields: [serviceProviderId], references: [id])
+  Transaction       Transaction[]   @relation("ServiceOfferingsToTransaction")
+}
+
+model Service {
+  id           String             @id @default(uuid())
+  description  String
+  name         String
+  basePrice    Float
+  category     String
+  createdAt    DateTime           @default(now())
+  isActive     Boolean            @default(true)
+  updatedAt    DateTime           @updatedAt
+  providers    ServiceOfferings[]
+  transactions Transaction[]      @relation("TransactionServices")
+}
+
+model Transaction {
+  id                String             @id @default(uuid())
+  buyerId           String
+  totalAmount       Int
+  status            String             @default("PENDING")
+  paymentMethod     String             @default("CASH")
+  serviceProviderId String?
+  buyer             Customer           @relation(fields: [buyerId], references: [id])
+  serviceProvider   ServiceProvider?   @relation("ServiceProviderTransactions", fields: [serviceProviderId], references: [id])
+  serviceOfferings  ServiceOfferings[] @relation("ServiceOfferingsToTransaction")
+  FarmInput         FarmInput[]        @relation("TransactionInputs")
+  produce           Produce[]          @relation("TransactionProduce")
+  products          Product[]          @relation("TransactionProducts")
+  services          Service[]          @relation("TransactionServices")
+}
+
+model Crop {
+  id           String         @id @default(uuid())
+  name         String         @unique
+  description  String
+  agronomy     Agronomy[]
+  CostTemplate CostTemplate[]
+  inputs       CropInput[]
+  CropVariety  CropVariety[]
+  diseases     Disease[]
+  pests        Pest[]
+}
+
+model Agronomy {
+  id      String @id @default(uuid())
+  content String
+  cropId  String
+  crop    Crop   @relation(fields: [cropId], references: [id])
+}
+
+model CropInput {
+  id          String @id @default(uuid())
+  name        String
+  type        String
+  description String
+  cropId      String
+  crop        Crop   @relation(fields: [cropId], references: [id])
+}
+
+model Pest {
+  id          String  @id @default(uuid())
+  name        String
+  description String
+  control     String?
+  cropId      String
+  crop        Crop    @relation(fields: [cropId], references: [id])
+}
+
+model Disease {
+  id          String  @id @default(uuid())
+  name        String
+  description String
+  treatment   String?
+  cropId      String
+  crop        Crop    @relation(fields: [cropId], references: [id])
+}
+
+model CropVariety {
+  id               String     @id @default(uuid())
+  cropId           String
+  yieldPotential   String
+  daysToMaturity   Int
+  description      String
+  name             String
+  yieldPerAcre     String
+  kgPerAcre        Int
+  marketPricePerKg Float?
+  crop             Crop       @relation(fields: [cropId], references: [id])
+  FarmPlan         FarmPlan[]
+}
+
+model FarmPlan {
+  id               String         @id @default(uuid())
+  name             String
+  plantingDate     DateTime
+  gardenSize       Float
+  farmerId         String
+  varietyId        String
+  estimatedYield   Float?
+  estimatedRevenue Float?
+  estimatedProfit  Float?
+  costs            Cost[]
+  activities       FarmActivity[]
+  farmer           Farmer         @relation(fields: [farmerId], references: [id])
+  variety          CropVariety    @relation(fields: [varietyId], references: [id])
+  records          FarmRecord[]
+}
+
+model CostTemplate {
+  id          String   @id @default(uuid())
+  type        CostType
+  stage       Stage
+  amount      Float
+  cropId      String
+  description String?
+  isRequired  Boolean  @default(true)
+  crop        Crop     @relation(fields: [cropId], references: [id])
+}
+
+model Cost {
+  id          String   @id @default(uuid())
+  farmPlanId  String
+  type        CostType
+  stage       Stage
+  description String?
+  amount      Float
+  isCustom    Boolean  @default(false)
+  farmPlan    FarmPlan @relation(fields: [farmPlanId], references: [id])
+}
+
+model FarmActivity {
+  id          String   @id @default(uuid())
+  farmPlanId  String
+  title       String
+  description String?
+  photoUrl    String?
+  timestamp   DateTime @default(now())
+  farmPlan    FarmPlan @relation(fields: [farmPlanId], references: [id])
+}
+
+model FarmRecord {
+  id         String   @id @default(uuid())
+  farmPlanId String
+  type       String
+  details    String
+  createdAt  DateTime @default(now())
+  farmPlan   FarmPlan @relation(fields: [farmPlanId], references: [id])
+}
+
+model Weather {
+  id          Int      @id @default(autoincrement())
+  farmerId    String?
+  location    String
+  temperature Float
+  humidity    Float
+  windSpeed   Float
+  conditions  String
+  description String
+  icon        String
+  timestamp   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  Farmer      Farmer?  @relation(fields: [farmerId], references: [id])
+}
+
+model Investment {
+  id                String                  @id @default(uuid())
+  investorId        String
+  initialAmount     Float
+  currentBalance    Float
+  monthlyReturnRate Float                   @default(7.1)
+  totalEarned       Float                   @default(0)
+  status            InvestmentStatus        @default(ACTIVE)
+  startDate         DateTime                @default(now())
+  endDate           DateTime?
+  nextPayoutDate    DateTime
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+  investor          User                    @relation(fields: [investorId], references: [id])
+  inventory         InvestmentInventory[]
+  transactions      InvestmentTransaction[]
+  payouts           Payout[]
+}
+
+model Payout {
+  id            String       @id @default(uuid())
+  investmentId  String
+  amount        Float
+  status        PayoutStatus @default(PENDING)
+  scheduledDate DateTime
+  paidDate      DateTime?
+  createdAt     DateTime     @default(now())
+  investment    Investment   @relation(fields: [investmentId], references: [id])
+}
+
+model InvestmentTransaction {
+  id           String     @id @default(uuid())
+  investmentId String
+  type         String
+  amount       Float
+  description  String
+  status       String     @default("completed")
+  date         DateTime   @default(now())
+  investment   Investment @relation(fields: [investmentId], references: [id])
+}
+
+model InvestmentInventory {
+  id                 String           @id @default(uuid())
+  investmentId       String
+  productType        String           @default("Rice")
+  totalPurchased     Int
+  sold               Int              @default(0)
+  remaining          Int
+  averageBuyPrice    Float
+  currentMarketPrice Float
+  currentValue       Float
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  investment         Investment       @relation(fields: [investmentId], references: [id])
+  sales              InvestmentSale[]
+}
+
+model InvestmentSale {
+  id           String              @id @default(uuid())
+  inventoryId  String
+  date         DateTime            @default(now())
+  quantity     Int
+  pricePerUnit Float
+  totalAmount  Float
+  buyer        String
+  inventory    InvestmentInventory @relation(fields: [inventoryId], references: [id])
+}
+
+/// ----------Organised------------------
 enum ProduceStatus {
   HARVESTED
   IN_TRANSIT
@@ -75,595 +588,4 @@ enum PayoutStatus {
   PAID
   FAILED
   PROCESSING
-}
-
-// ====================== CONFIGURATION ======================
-generator client {
-  provider = "prisma-client-js"
-}
-
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
-// ========================= MODELS =========================
-
-// -------- Product & Market --------
-model Product {
-  id        String   @id @default(uuid())
-  name      String
-  price     Int
-  unit      String   @default("Kgs")
-  quantity  Int
-  createdAt DateTime @default(now())
-
-  // Relations
-  Processing_Facility Facility[]      @relation("FacilityProducts")
-  QR_code             QRCode[]        @relation("QRCodeProducts")
-  shipment            Shipment[]      @relation("ShipmentProducts")
-  farmer              Farmer[]        @relation("FarmerProducts")
-  produce             Produce[]       @relation("ProduceProducts")
-  transporter         Transporter?    @relation(fields: [transporterId], references: [id])
-  transporterId       String?
-  marketListings      MarketListing[]
-  transactions        Transaction[]   @relation("TransactionProducts")
-
-  TraceabilityLog TraceabilityLog[]
-}
-
-model MarketListing {
-  id          String   @id @default(uuid())
-  productId   String
-  product     Product  @relation(fields: [productId], references: [id])
-  sellerId    String
-  sellerType  String
-  price       Int
-  quantity    Int
-  location    String
-  isAvailable Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
-
-// -------- Produce Flow --------
-model Produce {
-  id             String        @id @default(uuid())
-  type           String
-  region         String        @default("Eastern")
-  quantity       Int
-  price          Int           @default(0)
-  unit           String        @default("kgs")
-  harvestDate    DateTime
-  qualityReport  QualityGrade?
-  status         ProduceStatus @default(HARVESTED)
-  isBiofortified Boolean       @default(false)
-  createdAt      DateTime      @default(now())
-
-  farmerId       String?
-  farmer         Farmer?          @relation(fields: [farmerId], references: [id])
-  qrCode         QRCode?
-  shipments      Shipment[]
-  storage        Storage?
-  loadAtFacility loadAtFacility[]
-  facilities     Facility[]       @relation("ProduceFacilities")
-  products       Product[]        @relation("ProduceProducts")
-  transactions   Transaction[]    @relation("TransactionProduce")
-
-  TraceabilityLog TraceabilityLog[]
-}
-
-model Storage {
-  id         String   @id @default(uuid())
-  facilityId String
-  produceId  String   @unique
-  quantity   Int
-  storedAt   DateTime @default(now())
-
-  facility  Facility   @relation(fields: [facilityId], references: [id])
-  produce   Produce    @relation(fields: [produceId], references: [id])
-  shipments Shipment[]
-}
-
-model loadAtFacility {
-  id         String   @id @default(uuid())
-  facilityId String
-  produceId  String
-  quantity   Int
-  loadedAt   DateTime @default(now())
-
-  facility  Facility   @relation(fields: [facilityId], references: [id], onDelete: Cascade)
-  produce   Produce    @relation(fields: [produceId], references: [id])
-  shipments Shipment[]
-}
-
-model QRCode {
-  id          String    @id @default(uuid())
-  produceId   String    @unique
-  generatedAt DateTime  @default(now())
-  scannedAt   DateTime?
-
-  produce  Produce   @relation(fields: [produceId], references: [id])
-  products Product[] @relation("QRCodeProducts")
-}
-
-// -------- Shipment & Transport --------
-model Shipment {
-  id           String         @id @default(uuid())
-  destination  String
-  status       ShipmentStatus @default(PENDING)
-  deliveryDate DateTime?
-
-  produceId     String
-  transporterId String?
-  facilityId    String?
-  storageId     String?
-
-  produce        Produce          @relation(fields: [produceId], references: [id])
-  transporter    Transporter?     @relation(fields: [transporterId], references: [id])
-  facility       Facility?        @relation(fields: [facilityId], references: [id])
-  storage        Storage?         @relation(fields: [storageId], references: [id])
-  loadAtFacility loadAtFacility[]
-  products       Product[]        @relation("ShipmentProducts")
-}
-
-model Transporter {
-  id             String  @id @default(uuid())
-  name           String
-  contact        String
-  vehicleDetails String?
-  status         String
-  Region         String
-
-  shipments Shipment[]
-  products  Product[]
-}
-
-// -------- Facilities --------
-model Facility {
-  id                String  @id @default(uuid())
-  name              String
-  location          String
-  processingDetails String?
-  workload          Int     @default(0)
-
-  shipments       Shipment[]
-  storage         Storage[]
-  loads           loadAtFacility[]
-  producesHandled Produce[]        @relation("ProduceFacilities")
-  products        Product[]        @relation("FacilityProducts")
-}
-
-// -------- Users (Farmer & Customer) --------
-model Farmer {
-  id          String  @id @default(uuid())
-  name        String
-  contact     String  @unique
-  location    String
-  password    String
-  farmDetails String?
-
-  groupId  String?
-  group    Group?     @relation("GroupFarmers", fields: [groupId], references: [id])
-  produce  Produce[]
-  problems Problem[]
-  products Product[]  @relation("FarmerProducts")
-  FarmPlan FarmPlan[]
-
-  Report Report[]
-
-  Weather Weather[]
-}
-
-model Customer {
-  id              String  @id @default(uuid())
-  name            String
-  contact         String  @unique
-  password        String
-  purchaseHistory String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  transactions Transaction[]
-}
-
-// -------- Groups --------
-model Group {
-  id            String   @id @default(uuid())
-  cropType      String
-  region        String
-  totalQuantity Int      @default(0)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  farmers Farmer[] @relation("GroupFarmers")
-}
-
-// -------- Problem Reporting --------
-model Problem {
-  id       String @id @default(uuid())
-  farmtype String
-  Crop     String
-  Disease  String
-  Pest     String
-  farmerId String
-
-  farmer   Farmer            @relation(fields: [farmerId], references: [id])
-  progress ProblemProgress[]
-  reportId String?
-  report   Report?           @relation(fields: [reportId], references: [id])
-}
-
-model ProblemProgress {
-  id        String        @id @default(uuid())
-  problemId String
-  update    String
-  updatedBy String
-  status    ProblemStatus @default(REPORTED)
-  updatedAt DateTime      @default(now())
-
-  problem Problem @relation(fields: [problemId], references: [id])
-}
-
-// -------- Reports --------
-
-model Report {
-  id        String    @id @default(uuid())
-  startDate String
-  endDate   String
-  farmerId  String
-  farmer    Farmer    @relation(fields: [farmerId], references: [id])
-  problems  Problem[] // optional one-to-many
-}
-
-model FarmInput {
-  id           String        @id @default(uuid())
-  name         String
-  type         String
-  quantity     Int
-  unit         String
-  price        Int           @default(0)
-  createdAt    DateTime      @default(now())
-  transactions Transaction[] @relation("TransactionInputs")
-}
-
-// -------- Users Table --------
-model User {
-  id         String       @id @default(cuid())
-  name       String
-  email      String       @unique
-  contact    String       @unique
-  password   String
-  userRole   UserRole
-  location   String?
-  district   String?
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
-  Investment Investment[]
-
-  @@map("users")
-}
-
-// -------- Traceability Logs --------
-model TraceabilityLog {
-  id         String          @id @default(uuid())
-  actionType TraceActionType
-  productId  String
-  timestamp  DateTime        @default(now())
-
-  product   Product  @relation(fields: [productId], references: [id])
-  produceId String?
-  produce   Produce? @relation(fields: [produceId], references: [id])
-}
-
-// ================== SERVICE PROVIDERS ==================
-model ServiceProvider {
-  id              String             @id @default(uuid())
-  name            String
-  contact         String             @unique
-  email           String             @unique
-  password        String
-  businessName    String
-  description     String?
-  location        String
-  region          String             @default("Eastern")
-  rating          Float?             @default(0.0)
-  isVerified      Boolean            @default(false)
-  role            UserRole           @default(EXPERT)
-  createdAt       DateTime           @default(now())
-  // updatedAt DateTime @updatedAt()
-  // Service details
-  servicesOffered ServiceOfferings[]
-  qualifications  String[] // Array of certifications/qualifications
-  equipment       String[] // Array of equipment available
-  minOrderAmount  Float? // Minimum order value required
-  availability    String             @default("Monday-Friday, 8AM-5PM")
-  travelRadius    Int? // Maximum distance they'll travel (in km)
-  profileImage    String? // URL to profile image
-
-  // Relations
-  transactions Transaction[] @relation("ServiceProviderTransactions")
-}
-
-model ServiceOfferings {
-  id                String  @id @default(uuid())
-  serviceId         String
-  serviceProviderId String
-  rate              Float // Custom rate for this provider (can differ from base price)
-  minQuantity       Int?    @default(1) // Minimum quantity required
-  unit              String  @default("session")
-  notes             String? // Any special notes about this service
-  isActive          Boolean @default(true)
-
-  // Relations
-  service         Service         @relation(fields: [serviceId], references: [id])
-  serviceProvider ServiceProvider @relation(fields: [serviceProviderId], references: [id])
-
-  Transaction Transaction[]
-}
-
-// Update existing Service model to connect with providers
-model Service {
-  id          String   @id @default(uuid())
-  name        String
-  description String
-  basePrice   Float // Default/base price
-  category    String
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Add provider relationship
-  providers ServiceOfferings[]
-
-  // Existing relation
-  transactions Transaction[] @relation("TransactionServices")
-}
-
-model Transaction {
-  id            String @id @default(uuid())
-  buyerId       String
-  totalAmount   Int
-  paymentMethod String @default("CASH")
-  status        String @default("PENDING")
-
-  // Add service provider reference
-  serviceProviderId String?
-  serviceProvider   ServiceProvider? @relation(fields: [serviceProviderId], references: [id], name: "ServiceProviderTransactions")
-
-  // Existing relations
-  buyer            Customer           @relation(fields: [buyerId], references: [id])
-  products         Product[]          @relation("TransactionProducts")
-  produce          Produce[]          @relation("TransactionProduce")
-  services         Service[]          @relation("TransactionServices")
-  FarmInput        FarmInput[]        @relation("TransactionInputs")
-  serviceOfferings ServiceOfferings[]
-}
-
-////======================Farm Management=========================
-//// Agronomy Information
-
-model Crop {
-  id           String         @id @default(uuid())
-  name         String         @unique
-  description  String
-  agronomy     Agronomy[]
-  inputs       CropInput[]
-  pests        Pest[]
-  diseases     Disease[]
-  CropVariety  CropVariety[]
-  CostTemplate CostTemplate[]
-}
-
-model Agronomy {
-  id      String @id @default(uuid())
-  content String // Could be bullet points in markdown or separate items
-  cropId  String
-  crop    Crop   @relation(fields: [cropId], references: [id])
-}
-
-model CropInput {
-  id          String @id @default(uuid())
-  name        String
-  type        String // E.g. Herbicide, Fertilizer, etc.
-  description String
-  cropId      String
-  crop        Crop   @relation(fields: [cropId], references: [id])
-}
-
-model Pest {
-  id          String  @id @default(uuid())
-  name        String
-  description String
-  control     String? // Optional: How to control it
-  cropId      String
-  crop        Crop    @relation(fields: [cropId], references: [id])
-}
-
-model Disease {
-  id          String  @id @default(uuid())
-  name        String
-  description String
-  treatment   String? // Optional: How to treat it
-  cropId      String
-  crop        Crop    @relation(fields: [cropId], references: [id])
-}
-
-///=======Farm Managemnt======
-
-model CropVariety {
-  id               String     @id @default(uuid())
-  name             String
-  description      String
-  daysToMaturity   Int
-  yieldPotential   String
-  kgPerAcre        Int // ✅ Add this to CropVariety model
-  yieldPerAcre     String // ✅ Add this to CropVariety model
-  cropId           String
-  crop             Crop       @relation(fields: [cropId], references: [id])
-  FarmPlan         FarmPlan[]
-  marketPricePerKg Float? // Optional: Market price per kg for this variety
-}
-
-model FarmPlan {
-  id           String   @id @default(uuid())
-  name         String
-  plantingDate DateTime
-  gardenSize   Float
-  farmerId     String
-  varietyId    String
-
-  // Estimates
-  estimatedYield   Float?
-  estimatedRevenue Float?
-  estimatedProfit  Float?
-
-  farmer     Farmer         @relation(fields: [farmerId], references: [id])
-  variety    CropVariety    @relation(fields: [varietyId], references: [id])
-  costs      Cost[]
-  activities FarmActivity[]
-  records    FarmRecord[]
-}
-
-model CostTemplate {
-  id          String   @id @default(uuid())
-  cropId      String
-  type        CostType
-  stage       Stage
-  // category    String
-  description String?
-  amount      Float
-  isRequired  Boolean  @default(true)
-
-  crop Crop @relation(fields: [cropId], references: [id])
-}
-
-model Cost {
-  id          String   @id @default(uuid())
-  farmPlanId  String
-  type        CostType
-  stage       Stage
-  // category    String
-  description String?
-  amount      Float
-  isCustom    Boolean  @default(false)
-
-  farmPlan FarmPlan @relation(fields: [farmPlanId], references: [id])
-}
-
-model FarmActivity {
-  id          String   @id @default(uuid())
-  farmPlanId  String
-  title       String
-  description String?
-  photoUrl    String?
-  timestamp   DateTime @default(now())
-
-  farmPlan FarmPlan @relation(fields: [farmPlanId], references: [id])
-}
-
-model FarmRecord {
-  id         String   @id @default(uuid())
-  farmPlanId String
-  type       String
-  details    String
-  createdAt  DateTime @default(now())
-
-  farmPlan FarmPlan @relation(fields: [farmPlanId], references: [id])
-}
-
-model Weather {
-  id          Int      @id @default(autoincrement())
-  farmerId    String?
-  location    String
-  temperature Float
-  humidity    Float
-  windSpeed   Float
-  conditions  String
-  description String
-  icon        String
-  timestamp   DateTime
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Optional: if you have a Farmer model
-  Farmer Farmer? @relation(fields: [farmerId], references: [id])
-}
-
-/// INVESTMENTCOSTS
-// ================== INVESTMENT MODELS ==================
-
-model Investment {
-  id                String           @id @default(uuid())
-  investorId        String
-  initialAmount     Float
-  currentBalance    Float
-  monthlyReturnRate Float            @default(7.1) // 7.1% default return
-  totalEarned       Float            @default(0)
-  status            InvestmentStatus @default(ACTIVE)
-  startDate         DateTime         @default(now())
-  endDate           DateTime?
-  nextPayoutDate    DateTime
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-
-  // Relations
-  investor     User                    @relation(fields: [investorId], references: [id])
-  payouts      Payout[]
-  transactions InvestmentTransaction[]
-  inventory    InvestmentInventory[]
-}
-
-model Payout {
-  id            String       @id @default(uuid())
-  investmentId  String
-  amount        Float
-  status        PayoutStatus @default(PENDING)
-  scheduledDate DateTime
-  paidDate      DateTime?
-  createdAt     DateTime     @default(now())
-
-  investment Investment @relation(fields: [investmentId], references: [id])
-}
-
-model InvestmentTransaction {
-  id           String   @id @default(uuid())
-  investmentId String
-  type         String // 'investment', 'payout', 'sale', 'expense'
-  amount       Float
-  description  String
-  status       String   @default("completed")
-  date         DateTime @default(now())
-
-  investment Investment @relation(fields: [investmentId], references: [id])
-}
-
-model InvestmentInventory {
-  id                 String   @id @default(uuid())
-  investmentId       String
-  productType        String   @default("Rice")
-  totalPurchased     Int // in kg
-  sold               Int      @default(0)
-  remaining          Int
-  averageBuyPrice    Float
-  currentMarketPrice Float
-  currentValue       Float
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-
-  investment Investment       @relation(fields: [investmentId], references: [id])
-  sales      InvestmentSale[]
-}
-
-model InvestmentSale {
-  id           String   @id @default(uuid())
-  inventoryId  String
-  date         DateTime @default(now())
-  quantity     Int
-  pricePerUnit Float
-  totalAmount  Float
-  buyer        String
-
-  inventory InvestmentInventory @relation(fields: [inventoryId], references: [id])
 }
