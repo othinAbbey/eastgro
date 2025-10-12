@@ -29,13 +29,13 @@ enum ProblemStatus {
   CLOSED
 }
 
-enum userRole {
+enum UserRole {
   ADMIN
   FARMER
   CUSTOMER
-  TRANSPORTER
-  FACILITY_MANAGER
-  AGENT
+  SOLE_TRADER
+  PASSIVE_TRADER
+  GUEST
   EXPERT
 }
 
@@ -48,14 +48,43 @@ enum TraceActionType {
   SOLD
 }
 
+enum CostType {
+  ONE_TIME
+  SEASONAL
+  INVESTMENTCOSTS
+}
+
+enum Stage {
+  LAND_PREPARATION
+  PLANTING
+  MANAGEMENT
+  HARVEST
+  POST_HARVEST
+  MARKETING
+}
+
+enum InvestmentStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  PENDING
+}
+
+enum PayoutStatus {
+  PENDING
+  PAID
+  FAILED
+  PROCESSING
+}
+
 // ====================== CONFIGURATION ======================
+generator client {
+  provider = "prisma-client-js"
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-}
-
-generator client {
-  provider = "prisma-client-js"
 }
 
 // ========================= MODELS =========================
@@ -227,14 +256,14 @@ model Farmer {
 }
 
 model Customer {
-  id              String   @id @default(uuid())
+  id              String  @id @default(uuid())
   name            String
-  contact         String   @unique
+  contact         String  @unique
   password        String
   purchaseHistory String?
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   transactions Transaction[]
 }
@@ -263,8 +292,7 @@ model Problem {
   farmer   Farmer            @relation(fields: [farmerId], references: [id])
   progress ProblemProgress[]
   reportId String?
-  report   Report? @relation(fields: [reportId], references: [id])
-
+  report   Report?           @relation(fields: [reportId], references: [id])
 }
 
 model ProblemProgress {
@@ -289,7 +317,6 @@ model Report {
   problems  Problem[] // optional one-to-many
 }
 
-
 model FarmInput {
   id           String        @id @default(uuid())
   name         String
@@ -303,19 +330,20 @@ model FarmInput {
 
 // -------- Users Table --------
 model User {
-  id          String        @id @default(uuid())
-  name        String
-  contact     String        @unique
-  email       String        @unique
-  password    String
-  userRole    String        @default("GUEST")
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id         String       @id @default(cuid())
+  name       String
+  email      String       @unique
+  contact    String       @unique
+  password   String
+  userRole   UserRole
+  location   String?
+  district   String?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  Investment Investment[]
 
-  // Relations
-  investments Investment[]
+  @@map("users")
 }
-
 
 // -------- Traceability Logs --------
 model TraceabilityLog {
@@ -324,10 +352,9 @@ model TraceabilityLog {
   productId  String
   timestamp  DateTime        @default(now())
 
-  product Product @relation(fields: [productId], references: [id])
+  product   Product  @relation(fields: [productId], references: [id])
   produceId String?
-  produce    Produce? @relation(fields: [produceId], references: [id])
-
+  produce   Produce? @relation(fields: [produceId], references: [id])
 }
 
 // ================== SERVICE PROVIDERS ==================
@@ -343,7 +370,7 @@ model ServiceProvider {
   region          String             @default("Eastern")
   rating          Float?             @default(0.0)
   isVerified      Boolean            @default(false)
-  role            userRole           @default(EXPERT)
+  role            UserRole           @default(EXPERT)
   createdAt       DateTime           @default(now())
   // updatedAt DateTime @updatedAt()
   // Service details
@@ -358,8 +385,6 @@ model ServiceProvider {
   // Relations
   transactions Transaction[] @relation("ServiceProviderTransactions")
 }
-
-
 
 model ServiceOfferings {
   id                String  @id @default(uuid())
@@ -395,8 +420,6 @@ model Service {
   // Existing relation
   transactions Transaction[] @relation("TransactionServices")
 }
-
-
 
 model Transaction {
   id            String @id @default(uuid())
@@ -468,20 +491,6 @@ model Disease {
 }
 
 ///=======Farm Managemnt======
-enum CostType {
-  ONE_TIME
-  SEASONAL
-  INVESTMENTCOSTS
-}
-
-enum Stage {
-  LAND_PREPARATION
-  PLANTING
-  MANAGEMENT
-  HARVEST
-  POST_HARVEST
-  MARKETING
-}
 
 model CropVariety {
   id               String     @id @default(uuid())
@@ -517,7 +526,6 @@ model FarmPlan {
   records    FarmRecord[]
 }
 
-
 model CostTemplate {
   id          String   @id @default(uuid())
   cropId      String
@@ -530,6 +538,7 @@ model CostTemplate {
 
   crop Crop @relation(fields: [cropId], references: [id])
 }
+
 model Cost {
   id          String   @id @default(uuid())
   farmPlanId  String
@@ -566,7 +575,7 @@ model FarmRecord {
 
 model Weather {
   id          Int      @id @default(autoincrement())
-  farmerId    String?     
+  farmerId    String?
   location    String
   temperature Float
   humidity    Float
@@ -584,36 +593,23 @@ model Weather {
 
 /// INVESTMENTCOSTS
 // ================== INVESTMENT MODELS ==================
-enum InvestmentStatus {
-  ACTIVE
-  COMPLETED
-  CANCELLED
-  PENDING
-}
-
-enum PayoutStatus {
-  PENDING
-  PAID
-  FAILED
-  PROCESSING
-}
 
 model Investment {
-  id                String         @id @default(uuid())
+  id                String           @id @default(uuid())
   investorId        String
   initialAmount     Float
   currentBalance    Float
-  monthlyReturnRate Float         @default(7.1) // 7.1% default return
-  totalEarned       Float         @default(0)
+  monthlyReturnRate Float            @default(7.1) // 7.1% default return
+  totalEarned       Float            @default(0)
   status            InvestmentStatus @default(ACTIVE)
-  startDate         DateTime      @default(now())
+  startDate         DateTime         @default(now())
   endDate           DateTime?
   nextPayoutDate    DateTime
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
   // Relations
-  investor     User           @relation(fields: [investorId], references: [id])
+  investor     User                    @relation(fields: [investorId], references: [id])
   payouts      Payout[]
   transactions InvestmentTransaction[]
   inventory    InvestmentInventory[]
@@ -632,31 +628,31 @@ model Payout {
 }
 
 model InvestmentTransaction {
-  id            String   @id @default(uuid())
-  investmentId  String
-  type          String   // 'investment', 'payout', 'sale', 'expense'
-  amount        Float
-  description   String
-  status        String   @default("completed")
-  date          DateTime @default(now())
+  id           String   @id @default(uuid())
+  investmentId String
+  type         String // 'investment', 'payout', 'sale', 'expense'
+  amount       Float
+  description  String
+  status       String   @default("completed")
+  date         DateTime @default(now())
 
   investment Investment @relation(fields: [investmentId], references: [id])
 }
 
 model InvestmentInventory {
-  id               String   @id @default(uuid())
-  investmentId     String
-  productType      String   @default("Rice")
-  totalPurchased   Int      // in kg
-  sold             Int      @default(0)
-  remaining        Int
-  averageBuyPrice  Float
+  id                 String   @id @default(uuid())
+  investmentId       String
+  productType        String   @default("Rice")
+  totalPurchased     Int // in kg
+  sold               Int      @default(0)
+  remaining          Int
+  averageBuyPrice    Float
   currentMarketPrice Float
-  currentValue     Float
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  currentValue       Float
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
-  investment Investment @relation(fields: [investmentId], references: [id])
+  investment Investment       @relation(fields: [investmentId], references: [id])
   sales      InvestmentSale[]
 }
 
@@ -671,5 +667,3 @@ model InvestmentSale {
 
   inventory InvestmentInventory @relation(fields: [inventoryId], references: [id])
 }
-
-

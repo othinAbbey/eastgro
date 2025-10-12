@@ -10,7 +10,11 @@
     "db:seed": "tsx prisma/seed.js",
     "db:reset": "prisma migrate reset && npm run db:seed",
     "db:studio": "prisma studio",
-    "db:seed:investments": "tsx prisma/seedInvestments.ts"
+    "db:seed:investments": "tsx prisma/seedInvestments.ts",
+    "build": "prisma generate && prisma db push && next build",
+    "start": "node server.js",
+    "prisma:generate": "prisma generate",
+    "prisma:push": "prisma db push"
   },
   "keywords": [],
   "author": "",
