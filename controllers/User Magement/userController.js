@@ -732,22 +732,132 @@ function exclude(user, keys) {
 }
 
 // Register a new user
+// const register = async (req, res) => {
+//   try {
+//     const { name, contact, email, password, userRole, location, district } = req.body;
+
+//     // Validate input
+//     if (!name || !contact || !email || !password || !userRole) {
+//       return res.status(400).json({ 
+//         error: 'Name, contact, email, password, and userRole are required' 
+//       });
+//     }
+
+//     if (!email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+//       return res.status(400).json({ error: 'Invalid email format' });
+//     }
+
+//     if (password.length < 8) {
+//       return res.status(400).json({ 
+//         error: 'Password must be at least 8 characters long' 
+//       });
+//     }
+
+//     // Use connection pooling with retry logic
+//     const result = await dbManager.query(async (prisma) => {
+//       // Check for existing user
+//       const existingUser = await prisma.user.findFirst({
+//         where: { OR: [{ email }, { contact }] }
+//       });
+
+//       if (existingUser) {
+//         const conflictField = existingUser.email === email ? 'email' : 'contact';
+//         throw new Error(`USER_EXISTS_${conflictField}`);
+//       }
+
+//       // Hash password and create user
+//       const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+//       const newUser = await prisma.user.create({
+//         data: {
+//           name,
+//           contact,
+//           email,
+//           password: hashedPassword,
+//           userRole,
+//           location: location || null,
+//           district: district || null
+//         }
+//       });
+
+//       // Exclude password from response
+//       const userWithoutPassword = exclude(newUser, ['password']);
+
+//       // Generate JWT token
+//       const token = jwt.sign(
+//         { id: newUser.id, role: newUser.userRole }, 
+//         JWT_SECRET, 
+//         { expiresIn: JWT_EXPIRES_IN }
+//       );
+
+//       return { user: userWithoutPassword, token };
+//     });
+
+//     return res.status(201).json({
+//       message: 'User registered successfully',
+//       user: result.user,
+//       token: result.token
+//     });
+
+//   } catch (error) {
+//     console.error('Registration error:', error);
+    
+//     if (error.message.startsWith('USER_EXISTS_')) {
+//       const field = error.message.replace('USER_EXISTS_', '');
+//       return res.status(409).json({ 
+//         error: `User with this ${field} already exists` 
+//       });
+//     }
+
+//     if (error.code === 'P1001' || error.code === 'P1017') {
+//       return res.status(503).json({ 
+//         error: 'Database service temporarily unavailable. Please try again.' 
+//       });
+//     }
+
+//     return res.status(500).json({ 
+//       error: 'An error occurred during registration' 
+//     });
+//   }
+// }
 const register = async (req, res) => {
   try {
-    const { name, contact, email, password, userRole, location, district } = req.body;
+    // Handle case-insensitive field names
+    const { 
+      name, Name,
+      contact, Contact, 
+      email, Email,
+      password, Password,
+      userRole, UserRole, userrole,
+      location, Location,
+      district, District
+    } = req.body;
+
+    // Normalize field names (use camelCase if provided, fallback to other cases)
+    const normalizedData = {
+      name: name || Name,
+      contact: contact || Contact,
+      email: email || Email,
+      password: password || Password,
+      userRole: userRole || UserRole || userrole,
+      location: location || Location,
+      district: district || District
+    };
+
+    const { name: finalName, contact: finalContact, email: finalEmail, password: finalPassword, userRole: finalUserRole, location: finalLocation, district: finalDistrict } = normalizedData;
 
     // Validate input
-    if (!name || !contact || !email || !password || !userRole) {
+    if (!finalName || !finalContact || !finalEmail || !finalPassword || !finalUserRole) {
       return res.status(400).json({ 
-        error: 'Name, contact, email, password, and userRole are required' 
+        error: 'Name, contact, email, password, and userRole are required',
+        received: normalizedData // This helps debug what was actually received
       });
     }
 
-    if (!email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+    if (!finalEmail.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
       return res.status(400).json({ error: 'Invalid email format' });
     }
 
-    if (password.length < 8) {
+    if (finalPassword.length < 8) {
       return res.status(400).json({ 
         error: 'Password must be at least 8 characters long' 
       });
@@ -757,25 +867,25 @@ const register = async (req, res) => {
     const result = await dbManager.query(async (prisma) => {
       // Check for existing user
       const existingUser = await prisma.user.findFirst({
-        where: { OR: [{ email }, { contact }] }
+        where: { OR: [{ email: finalEmail }, { contact: finalContact }] }
       });
 
       if (existingUser) {
-        const conflictField = existingUser.email === email ? 'email' : 'contact';
+        const conflictField = existingUser.email === finalEmail ? 'email' : 'contact';
         throw new Error(`USER_EXISTS_${conflictField}`);
       }
 
       // Hash password and create user
-      const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+      const hashedPassword = await bcrypt.hash(finalPassword, SALT_ROUNDS);
       const newUser = await prisma.user.create({
         data: {
-          name,
-          contact,
-          email,
+          name: finalName,
+          contact: finalContact,
+          email: finalEmail,
           password: hashedPassword,
-          userRole,
-          location: location || null,
-          district: district || null
+          userRole: finalUserRole,
+          location: finalLocation || null,
+          district: finalDistrict || null
         }
       });
 
@@ -819,7 +929,6 @@ const register = async (req, res) => {
     });
   }
 }
-
 // User login
 const login = async (req, res) => {
   try {
@@ -1391,7 +1500,7 @@ const searchUsersByRole = async (req, res)=> {
     return res.status(500).json({ error: 'Failed to search users' });
   }
 }
-// ... (Other functions follow the same pattern with dbManager.query)
+
 
 // Initialize connection on startup
 dbManager.connect().catch(console.error);
