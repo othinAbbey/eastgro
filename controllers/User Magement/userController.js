@@ -1106,7 +1106,291 @@ const getAllUsers = async (req, res) => {
     return res.status(500).json({ error: 'Failed to get users' });
   }
 }
+// Admin: Get User by ID
+const getUserById = async (req, res) => {
+  try {
+    if (req.user.role !== userRole.ADMIN) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
 
+    const { id } = req.params;
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        contact: true,
+        role: true,
+        createdAt: true,
+        updatedAt: true
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    return res.json({ user });
+  } catch (error) {
+    console.error('Get user by ID error:', error);
+    return res.status(500).json({ error: 'Failed to get user' });
+  }
+}
+// Admin: Update user role
+const updatedUser =  async (req, res)=> {
+  try {
+    // Check if user is admin
+    if (req.user.role !== userRole.ADMIN) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    const userId = req.params.id;
+    const { role } = req.body;
+
+    if (!Object.values(userRole).includes(role)) {
+      return res.status(400).json({ error: 'Invalid role' });
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { role },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        updatedAt: true
+      }
+    });
+
+    return res.json({
+      message: 'User role updated successfully',
+      user: updatedUser
+    });
+  } catch (error) {
+    console.error('Update user role error:', error);
+    return res.status(500).json({ error: 'Failed to update user role' });
+  }
+}
+
+// Admin: Delete user
+const deleteUser = async (req, res)=> {
+  try {
+    // Check if user is admin
+    if (req.user.role !== userRole.ADMIN) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    const userId = req.params.id;
+    await prisma.user.delete({ where: { id: userId } });
+
+    return res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    return res.status(500).json({ error: 'Failed to delete user' });
+  }
+}
+
+// Request password reset
+const requestPasswordReset = async (req, res)=> {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      // Don't reveal whether email exists for security
+      return res.json({ message: 'If the email exists, a reset link has been sent' });
+    }
+
+    // Generate reset token (expires in 1 hour)
+    const resetToken = jwt.sign(
+      { id: user.id, action: 'password_reset' },
+      JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    // In a real app, you would send an email with this token
+    return res.json({ 
+      message: 'Password reset link generated',
+      resetToken // In production, remove this line and actually send email
+    });
+  } catch (error) {
+    console.error('Password reset request error:', error);
+    return res.status(500).json({ error: 'Failed to process reset request' });
+  }
+}
+
+// Reset password with token
+const resetPassword = async (req, res)=> {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({ 
+        error: 'Token and new password are required' 
+      });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ 
+        error: 'New password must be at least 8 characters long' 
+      });
+    }
+
+    // Verify token
+    const decoded = jwt.verify(token, JWT_SECRET);
+    if (decoded.action !== 'password_reset') {
+      return res.status(400).json({ error: 'Invalid token' });
+    }
+
+    // Hash new password and update
+    const hashedPassword = await bcrypt.hash(newPassword, SALT_ROUNDS);
+    await prisma.user.update({
+      where: { id: decoded.id },
+      data: { password: hashedPassword }
+    });
+
+    return res.json({ message: 'Password reset successfully' });
+  } catch (error) {
+    console.error('Password reset error:', error);
+    if (error instanceof jwt.TokenExpiredError) {
+      return res.status(400).json({ error: 'Reset token has expired' });
+    }
+    if (error instanceof jwt.JsonWebTokenError) {
+      return res.status(400).json({ error: 'Invalid token' });
+    }
+    return res.status(500).json({ error: 'Failed to reset password' });
+  }
+}
+
+// Get users by role (paginated)
+const getUsersByRole = async (req, res) =>{
+  try {
+    const { role } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // Validate role
+    if (!Object.values(userRole).includes(role)) {
+      return res.status(400).json({ error: 'Invalid role' });
+    }
+
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where: { role },
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          createdAt: true
+        },
+        orderBy: { createdAt: 'desc' }
+      }),
+      prisma.user.count({ where: { role } })
+    ]);
+
+    return res.json({
+      users,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+        role
+      }
+    });
+  } catch (error) {
+    console.error('Get users by role error:', error);
+    return res.status(500).json({ error: 'Failed to get users by role' });
+  }
+}
+
+// Admin: Get user by ID
+
+
+// Count users by role
+const countUsersByRole = async (req, res)=> {
+  try {
+    const counts = await Promise.all(
+      Object.values(userRole).map(async (role) => {
+        const count = await prisma.user.count({ where: { role } });
+        return { role, count };
+      })
+    );
+
+    return res.json({ counts });
+  } catch (error) {
+    console.error('Count users by role error:', error);
+    return res.status(500).json({ error: 'Failed to count users by role' });
+  }
+}
+
+// Search users by role with optional filters
+const searchUsersByRole = async (req, res)=> {
+  try {
+    const { role } = req.params;
+    const { query } = req.query;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // Validate role
+    if (!Object.values(userRole).includes(role)) {
+      return res.status(400).json({ error: 'Invalid role' });
+    }
+
+    const where = { role };
+    
+    if (query) {
+      where.OR = [
+        { name: { contains: query, mode: 'insensitive' } },
+        { email: { contains: query, mode: 'insensitive' } },
+        { contact: { contains: query, mode: 'insensitive' } }
+      ];
+    }
+
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          contact: true,
+          role: true,
+          createdAt: true
+        },
+        orderBy: { createdAt: 'desc' }
+      }),
+      prisma.user.count({ where })
+    ]);
+
+    return res.json({
+      users,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+        role,
+        query: query || null
+      }
+    });
+  } catch (error) {
+    console.error('Search users by role error:', error);
+    return res.status(500).json({ error: 'Failed to search users' });
+  }
+}
 // ... (Other functions follow the same pattern with dbManager.query)
 
 // Initialize connection on startup
