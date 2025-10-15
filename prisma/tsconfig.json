@@ -15,6 +15,6 @@
   "ts-node": {
     "esm": true
   },
-  "include": ["prisma/**/*"],
+  "include": ["../src/**/*"],
   "exclude": ["node_modules"]
 }
