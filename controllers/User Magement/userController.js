@@ -144,22 +144,22 @@ const register = async (req, res) => {
     console.log('✅ Validation passed, checking existing user...');
 
     // DIRECT Prisma call - no wrapper
-    const existingUser = await prisma.user.findFirst({
-      where: { 
-        OR: [
-          { email: finalEmail.toLowerCase() },
-          { contact: finalContact }
-        ]
-      }
-    });
+    // const existingUser = await prisma.user.findFirst({
+    //   where: { 
+    //     OR: [
+    //       { email: finalEmail.toLowerCase() },
+    //       { contact: finalContact }
+    //     ]
+    //   }
+    // });
 
-    if (existingUser) {
-      console.log('❌ User already exists');
-      const conflictField = existingUser.email === finalEmail.toLowerCase() ? 'email' : 'contact';
-      return res.status(409).json({ 
-        error: `User with this ${conflictField} already exists` 
-      });
-    }
+    // if (existingUser) {
+    //   console.log('❌ User already exists');
+    //   const conflictField = existingUser.email === finalEmail.toLowerCase() ? 'email' : 'contact';
+    //   return res.status(409).json({ 
+    //     error: `User with this ${conflictField} already exists` 
+    //   });
+    // }
 
     console.log('✅ No existing user found, creating user...');
 
