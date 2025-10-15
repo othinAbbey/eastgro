@@ -1,22 +1,16 @@
 //imports
 import bcrypt from 'bcrypt'; // For password hashing
 import jwt from 'jsonwebtoken'; // For JWT token generation
-import { PrismaClient } from '@prisma/client'; // Prisma Client intiation
-import dotenv from 'dotenv'; // For environment variables
-import { checkDatabaseConnection } from '../../lib/prisma.js'; // Import the connection check function
+import { PrismaClient } from '@prisma/client'; //
+import dotenv from 'dotenv';
 
-// Check database connection at startup
-checkDatabaseConnection();
-dotenv.config(); // Load .env variables
+dotenv.config();
 
-// Simple Prisma client to interact with the database
+// Simple Prisma client
 const prisma = new PrismaClient({
-  log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'], // Log only warnings and errors in development
-  errorFormat: 'pretty' ,// Pretty error formatting
-  //log errors to console
-  console: (e) => console.error('Prisma Error: ', e)
+  log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
 });
- 
+
 const SALT_ROUNDS = 10;
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
