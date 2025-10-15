@@ -773,13 +773,35 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Simple Prisma client
-const prisma = new PrismaClient();
+// Fixed Prisma client with connection handling
+const prisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL
+    },
+  },
+});
+
+// Connection management
+let isConnected = false;
+
+const ensureConnection = async () => {
+  if (!isConnected) {
+    try {
+      await prisma.$connect();
+      isConnected = true;
+      console.log('✅ Database connected');
+    } catch (error) {
+      console.error('❌ Database connection failed:', error);
+      throw error;
+    }
+  }
+};
 
 const SALT_ROUNDS = 10;
 const JWT_SECRET = process.env.JWT_SECRET || 'test-secret';
 
-// Simple role mapping for testing
+// Simple role mapping
 const ROLE_MAPPING = {
   'SOLE_TRADER': 'SOLETRADER',
   'PASSIVE_TRADER': 'PASSIVETRADER',
@@ -788,7 +810,7 @@ const ROLE_MAPPING = {
   'CUSTOMER': 'CUSTOMER'
 };
 
-// Test registration only
+// Test registration with connection retry
 const register = async (req, res) => {
   console.log('🚀 TEST Registration request:', req.body);
   
@@ -803,6 +825,9 @@ const register = async (req, res) => {
       });
     }
 
+    // Ensure connection before proceeding
+    await ensureConnection();
+
     // Normalize role
     const normalizedRole = ROLE_MAPPING[userRole.toUpperCase()] || userRole.toUpperCase();
     
@@ -811,18 +836,42 @@ const register = async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
     
-    // Create user
-    const newUser = await prisma.user.create({
-      data: {
-        name,
-        contact,
-        email: email.toLowerCase(),
-        password: hashedPassword,
-        userRole: normalizedRole,
-        location: location || null,
-        district: district || null
+    // Create user with retry logic
+    let newUser;
+    try {
+      newUser = await prisma.user.create({
+        data: {
+          name,
+          contact,
+          email: email.toLowerCase(),
+          password: hashedPassword,
+          userRole: normalizedRole,
+          location: location || null,
+          district: district || null
+        }
+      });
+    } catch (dbError) {
+      // If connection failed, try to reconnect and retry
+      if (dbError.code === 'P1001') {
+        console.log('🔄 Connection lost, reconnecting...');
+        isConnected = false;
+        await ensureConnection();
+        // Retry the operation
+        newUser = await prisma.user.create({
+          data: {
+            name,
+            contact,
+            email: email.toLowerCase(),
+            password: hashedPassword,
+            userRole: normalizedRole,
+            location: location || null,
+            district: district || null
+          }
+        });
+      } else {
+        throw dbError;
       }
-    });
+    }
 
     console.log('✅ User created successfully - ID:', newUser.id);
 
@@ -854,37 +903,56 @@ const register = async (req, res) => {
       });
     }
     
-    if (error.code === 'P1001') {
+    if (error.code === 'P1001' || error.code === 'P1017') {
       return res.status(503).json({ 
-        error: 'Database connection failed' 
+        error: 'Database connection failed. Please try again.' 
       });
     }
 
     return res.status(500).json({ 
       error: 'Registration failed',
-      details: error.message 
+      details: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 }
 
-// Simple connection test
+// Test database connection
 const testConnection = async (req, res) => {
   try {
+    await ensureConnection();
     await prisma.$queryRaw`SELECT 1`;
+    
+    // Also test if we can access the user table
+    const userCount = await prisma.user.count();
+    
     res.json({ 
       success: true, 
-      message: 'Database connected successfully' 
+      message: 'Database connected successfully',
+      userCount,
+      database: process.env.DATABASE_URL ? 'URL configured' : 'No URL'
     });
   } catch (error) {
+    console.error('Connection test failed:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Database connection failed',
-      details: error.message 
+      details: error.message,
+      code: error.code
     });
   }
+}
+
+// Check environment
+const checkEnv = (req, res) => {
+  res.json({
+    nodeEnv: process.env.NODE_ENV,
+    hasDatabaseUrl: !!process.env.DATABASE_URL,
+    databaseUrlLength: process.env.DATABASE_URL ? process.env.DATABASE_URL.length : 0
+  });
 }
 
 export {
   register,
-  testConnection
+  testConnection,
+  checkEnv
 };
