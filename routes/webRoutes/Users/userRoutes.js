@@ -2,7 +2,8 @@
 import express from 'express';
 const router = express.Router();
 import {
-  register,
+ 
+  register, healthCheck, getUsers
   // login,
   // getProfile,
   // updateProfile,
@@ -34,6 +35,8 @@ import {
 
 // Public routes (no authentication required)
 router.post('/register', register);
+router.get('/health', healthCheck);
+router.get('/users', getUsers);
 // router.post('/login',authLimiter, login);
 // router.post('/request-password-reset', requestPasswordReset);
 // router.post('/reset-password', resetPassword);

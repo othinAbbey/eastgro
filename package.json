@@ -20,27 +20,25 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@celo/contractkit": "^9.0.1",
-    "@prisma/client": "^6.4.1",
+    "@celo/contractkit": "^5.0.4",
     "@types/bcrypt": "^6.0.0",
     "africastalking": "^0.7.3",
     "axios": "^1.9.0",
     "bcrypt": "^5.1.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
-    "dotenv": "^16.4.7",
+    "dotenv": "^16.6.1",
     "express": "^4.21.2",
     "express-rate-limit": "^7.5.0",
     "joi": "^17.13.3",
     "jsonwebtoken": "^9.0.2",
     "memory-cache": "^0.2.0",
     "nodemon": "^3.1.10",
-    "pg": "^8.13.1",
+    "pg": "^8.16.3",
     "qrcode": "^1.5.4",
-    "sequelize": "^6.37.7"
+    "sequelize": "^1.2.1"
   },
   "devDependencies": {
-    "prisma": "^6.4.1",
     "tsx": "^4.20.6"
   },
   "prisma": {

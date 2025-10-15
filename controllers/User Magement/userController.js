@@ -765,194 +765,126 @@
 //   searchUsersByRole
 // };
 
-//imports
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
-import dotenv from 'dotenv';
+import { query, getClient } from '../config/database.js';
 
-dotenv.config();
+const SALT_ROUNDS = 12;
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret';
 
-// Fixed Prisma client with connection handling
-const prisma = new PrismaClient({
-  datasources: {
-    db: {
-      url: process.env.DATABASE_URL
-    },
-  },
-});
-
-// Connection management
-let isConnected = false;
-
-const ensureConnection = async () => {
-  if (!isConnected) {
-    try {
-      await prisma.$connect();
-      isConnected = true;
-      console.log('✅ Database connected');
-    } catch (error) {
-      console.error('❌ Database connection failed:', error);
-      throw error;
-    }
-  }
-};
-
-const SALT_ROUNDS = 10;
-const JWT_SECRET = process.env.JWT_SECRET || 'test-secret';
-
-// Simple role mapping
-const ROLE_MAPPING = {
-  'SOLE_TRADER': 'SOLETRADER',
-  'PASSIVE_TRADER': 'PASSIVETRADER',
-  'ADMIN': 'ADMIN',
-  'FARMER': 'FARMER',
-  'CUSTOMER': 'CUSTOMER'
-};
-
-// Test registration with connection retry
-const register = async (req, res) => {
-  console.log('🚀 TEST Registration request:', req.body);
+export const register = async (req, res) => {
+  const client = await getClient();
   
   try {
+    await client.query('BEGIN'); // Start transaction
+    
     const { name, contact, email, password, userRole, location, district } = req.body;
 
-    // Basic validation
+    console.log('📨 Registration request:', { name, email, contact });
+
+    // Validate required fields
     if (!name || !contact || !email || !password || !userRole) {
+      await client.query('ROLLBACK');
       return res.status(400).json({ 
-        error: 'Missing required fields',
-        required: ['name', 'contact', 'email', 'password', 'userRole']
+        error: 'Missing required fields: name, contact, email, password, userRole' 
       });
     }
 
-    // Ensure connection before proceeding
-    await ensureConnection();
+    // Check if user already exists
+    const existingResult = await client.query(
+      'SELECT email, contact FROM users WHERE email = $1 OR contact = $2 LIMIT 1',
+      [email.toLowerCase(), contact]
+    );
 
-    // Normalize role
-    const normalizedRole = ROLE_MAPPING[userRole.toUpperCase()] || userRole.toUpperCase();
-    
-    console.log('🔧 Creating user with role:', normalizedRole);
+    if (existingResult.rows.length > 0) {
+      await client.query('ROLLBACK');
+      const conflictField = existingResult.rows[0].email === email.toLowerCase() ? 'email' : 'contact';
+      return res.status(409).json({ 
+        error: `User with this ${conflictField} already exists` 
+      });
+    }
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
     
-    // Create user with retry logic
-    let newUser;
-    try {
-      newUser = await prisma.user.create({
-        data: {
-          name,
-          contact,
-          email: email.toLowerCase(),
-          password: hashedPassword,
-          userRole: normalizedRole,
-          location: location || null,
-          district: district || null
-        }
-      });
-    } catch (dbError) {
-      // If connection failed, try to reconnect and retry
-      if (dbError.code === 'P1001') {
-        console.log('🔄 Connection lost, reconnecting...');
-        isConnected = false;
-        await ensureConnection();
-        // Retry the operation
-        newUser = await prisma.user.create({
-          data: {
-            name,
-            contact,
-            email: email.toLowerCase(),
-            password: hashedPassword,
-            userRole: normalizedRole,
-            location: location || null,
-            district: district || null
-          }
-        });
-      } else {
-        throw dbError;
-      }
-    }
+    // Normalize role (SOLE_TRADER -> SOLETRADER)
+    const normalizedRole = userRole.toUpperCase().replace(/_/g, '');
 
-    console.log('✅ User created successfully - ID:', newUser.id);
+    console.log('🔧 Creating user with role:', normalizedRole);
 
-    // Generate simple token
+    // Insert user
+    const result = await client.query(
+      `INSERT INTO users (name, contact, email, password, user_role, location, district, created_at) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW()) 
+       RETURNING id, name, email, contact, user_role as "userRole", location, district, created_at as "createdAt"`,
+      [name, contact, email.toLowerCase(), hashedPassword, normalizedRole, location, district]
+    );
+
+    await client.query('COMMIT'); // Commit transaction
+    
+    const user = result.rows[0];
+    console.log('✅ User created successfully - ID:', user.id);
+
+    // Generate JWT token
     const token = jwt.sign(
-      { id: newUser.id, role: newUser.userRole }, 
+      { id: user.id, role: user.userRole }, 
       JWT_SECRET, 
       { expiresIn: '7d' }
     );
 
-    // Remove password from response
-    const { password: _, ...userWithoutPassword } = newUser;
-
-    return res.status(201).json({
+    res.status(201).json({
       success: true,
       message: 'User registered successfully',
-      user: userWithoutPassword,
+      user,
       token
     });
 
   } catch (error) {
+    await client.query('ROLLBACK'); // Rollback on error
     console.error('💥 Registration error:', error);
-    
-    // Handle specific errors
-    if (error.code === 'P2002') {
-      const field = error.meta?.target?.[0] || 'email or contact';
-      return res.status(409).json({ 
-        error: `User with this ${field} already exists` 
-      });
-    }
-    
-    if (error.code === 'P1001' || error.code === 'P1017') {
-      return res.status(503).json({ 
-        error: 'Database connection failed. Please try again.' 
-      });
-    }
-
-    return res.status(500).json({ 
+    res.status(500).json({ 
       error: 'Registration failed',
       details: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
+  } finally {
+    client.release(); // Always release client
   }
-}
+};
 
-// Test database connection
-const testConnection = async (req, res) => {
+export const healthCheck = async (req, res) => {
   try {
-    await ensureConnection();
-    await prisma.$queryRaw`SELECT 1`;
-    
-    // Also test if we can access the user table
-    const userCount = await prisma.user.count();
+    const result = await query('SELECT NOW() as time');
+    const userCount = await query('SELECT COUNT(*) FROM users');
     
     res.json({ 
-      success: true, 
-      message: 'Database connected successfully',
-      userCount,
-      database: process.env.DATABASE_URL ? 'URL configured' : 'No URL'
+      status: 'healthy', 
+      database: 'connected',
+      timestamp: result.rows[0].time,
+      userCount: parseInt(userCount.rows[0].count)
     });
   } catch (error) {
-    console.error('Connection test failed:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Database connection failed',
-      details: error.message,
-      code: error.code
+    console.error('Health check failed:', error);
+    res.status(503).json({ 
+      status: 'unhealthy', 
+      database: 'disconnected',
+      error: error.message 
     });
   }
-}
+};
 
-// Check environment
-const checkEnv = (req, res) => {
-  res.json({
-    nodeEnv: process.env.NODE_ENV,
-    hasDatabaseUrl: !!process.env.DATABASE_URL,
-    databaseUrlLength: process.env.DATABASE_URL ? process.env.DATABASE_URL.length : 0
-  });
-}
-
-export {
-  register,
-  testConnection,
-  checkEnv
+export const getUsers = async (req, res) => {
+  try {
+    const result = await query(
+      'SELECT id, name, email, contact, user_role as "userRole", location, district, created_at as "createdAt" FROM users ORDER BY created_at DESC'
+    );
+    
+    res.json({
+      success: true,
+      users: result.rows,
+      count: result.rows.length
+    });
+  } catch (error) {
+    console.error('Get users error:', error);
+    res.status(500).json({ error: 'Failed to get users' });
+  }
 };
