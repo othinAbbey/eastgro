@@ -321,23 +321,23 @@ const updateProfile = async (req, res) => {
     }
 
     // Check if new email or contact already exists
-    if (email || contact) {
-      const existingUser = await prisma.user.findFirst({
-        where: {
-          AND: [
-            { id: { not: userId } },
-            { OR: [{ email }, { contact }] }
-          ]
-        }
-      });
+    // if (email || contact) {
+    //   const existingUser = await prisma.user.findFirst({
+    //     where: {
+    //       AND: [
+    //         { id: { not: userId } },
+    //         { OR: [{ email }, { contact }] }
+    //       ]
+    //     }
+    //   });
 
-      if (existingUser) {
-        const conflictField = existingUser.email === email ? 'email' : 'contact';
-        return res.status(409).json({ 
-          error: `User with this ${conflictField} already exists` 
-        });
-      }
-    }
+    //   if (existingUser) {
+    //     const conflictField = existingUser.email === email ? 'email' : 'contact';
+    //     return res.status(409).json({ 
+    //       error: `User with this ${conflictField} already exists` 
+    //     });
+    //   }
+    // }
 
     const updatedUser = await prisma.user.update({
       where: { id: userId },
