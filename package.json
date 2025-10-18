@@ -5,16 +5,12 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "seed": "node prisma/seed.js",
-    "deploy": "prisma migrate deploy && node server.js",
-    "db:seed": "tsx prisma/seed.js",
-    "db:reset": "prisma migrate reset && npm run db:seed",
-    "db:studio": "prisma studio",
-    "db:seed:investments": "tsx prisma/seedInvestments.ts",
-    "build": "prisma generate && prisma db push && next build",
     "start": "node server.js",
-    "prisma:generate": "prisma generate",
-    "prisma:push": "prisma db push"
+    "dev": "nodemon server.js",
+    "build": "npm install",
+    "db:setup": "node config/database.setupDatabase.js",
+    "db:verify": "node config/database.verifyTables.js",
+    "db:reset": "node config/database.setupDatabase.js"
   },
   "keywords": [],
   "author": "",
@@ -36,13 +32,10 @@
     "nodemon": "^3.1.10",
     "pg": "^8.16.3",
     "qrcode": "^1.5.4",
-    "sequelize": "^1.2.1"
+    "sequelize": "^6.37.4"
   },
   "devDependencies": {
     "tsx": "^4.20.6"
-  },
-  "prisma": {
-    "seed": "tsx prisma/seed.js"
   },
   "type": "module"
 }

@@ -4,18 +4,14 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Render-optimized connection pool
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { 
-    rejectUnauthorized: false 
-  } : false,
+  ssl: { rejectUnauthorized: false },
   max: 10,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 10000,
 });
 
-// Connection events
 pool.on('connect', () => {
   console.log('✅ Connected to PostgreSQL database');
 });
