@@ -1,106 +1,47 @@
-
 // controllers/FarmPlanController.js
-import { PrismaClient } from "@prisma/client";
-const prisma = new PrismaClient();
-import {calculateCostsForPlan} from "../../utils/costCalculation.js"
-import { BaseWrapperForGoverning } from "@celo/contractkit/lib/wrappers/BaseWrapperForGoverning.js";
+import { query, getClient } from "../../config/database.js";
+import { calculateCostsForPlan } from '../../utils/costCalculation.js';
 
 // Helper function to calculate yield based on factors
-
 const calculateEstimatedYield = (baseYield, soilType, rainfall, fertilizerType) => {
-    let yieldFactor = 1;
-  
-    // Factor for soil type (loamy = best, sandy = worst)
-    const soilFactors = {
-      "Loamy": 1.2,
-      "Clay": 1.0,
-      "Sandy": 0.8
-    };
-    yieldFactor *= soilFactors[soilType] || 1;  // Default to 1 if not found
-  
-    // Factor for rainfall (low = poor, high = excellent)
-    const rainfallFactors = {
-      "Low": 0.8,
-      "Average": 1.0,
-      "High": 1.2
-    };
-    yieldFactor *= rainfallFactors[rainfall] || 1;  // Default to 1 if not found
-  
-    // Factor for fertilizer type (basic = lower, advanced = higher)
-    const fertilizerFactors = {
-      "Basic": 1.0,
-      "Organic": 1.1,   // Organic fertilizers are considered slightly better
-      "Advanced": 1.2   // Synthetic/Advanced fertilizers are better
-    };
-    yieldFactor *= fertilizerFactors[fertilizerType] || 1;  // Default to 1 if not found
-  
-    // Calculate the adjusted yield per acre
-    const adjustedYield = baseYield * yieldFactor;
-    return adjustedYield;
+  let yieldFactor = 1;
+
+  // Factor for soil type (loamy = best, sandy = worst)
+  const soilFactors = {
+    "Loamy": 1.2,
+    "Clay": 1.0,
+    "Sandy": 0.8
   };
+  yieldFactor *= soilFactors[soilType] || 1;  // Default to 1 if not found
 
-  //Fetch the cost templates for a specific crop variety
-// const  getTemplate = async function(req, res){
-//   const costs=  await prisma.costTemplate.findMany({
-//   where: {cropId},
-//   select: {
-//     type: true,
-//     stage: true,
-//     // category: true,
-//     description: true,
-//     amount: true
-//         },
-//   // orderBy: { type: 'asc' } // Order by type (ONE_TIME, SEASONAL, INVESTMENTCOSTS)
-// }
-// return costs;
-// }) 
-// const cropId = req.params.cropId
-// }
+  // Factor for rainfall (low = poor, high = excellent)
+  const rainfallFactors = {
+    "Low": 0.8,
+    "Average": 1.0,
+    "High": 1.2
+  };
+  yieldFactor *= rainfallFactors[rainfall] || 1;  // Default to 1 if not found
 
+  // Factor for fertilizer type (basic = lower, advanced = higher)
+  const fertilizerFactors = {
+    "Basic": 1.0,
+    "Organic": 1.1,   // Organic fertilizers are considered slightly better
+    "Advanced": 1.2   // Synthetic/Advanced fertilizers are better
+  };
+  yieldFactor *= fertilizerFactors[fertilizerType] || 1;  // Default to 1 if not found
 
+  // Calculate the adjusted yield per acre
+  const adjustedYield = baseYield * yieldFactor;
+  return adjustedYield;
+};
 
-// const getCosts =async function(req, res) {
-//   try {
-// const cropId= req.params.cropId;
-// console.log("Fetching farm plans for crop ID:", cropId);
-
-// const totalCosts = costs.reduce((sum, item)=>sum + parseFloat(item.amount || 0),0); // Ensure amount is a number
-// console.log(totalCosts);
-// res.status(400).json(totalCosts);
-// } catch(err){
-//   console.error(err);
-//   res.status(500).json({ message: 'Failed to fetch farm plans', error: err });
-// }
-// }
-
-// const getgroupCosts =async function(req,res){
-//   try {
-//   const groupedCosts = costs.reduce((acc, item) => {
- 
-//     if (!acc[item.type]) {
-//       acc[item.type] = 0; // Initialize if this type doesn't exist
-//     }
-//     acc[item.type] += item.amount; // Add the cost to the correct type group
-//     res.status(200).json(groupedCosts);
-//    }, {})
-//     return acc;
-    
-//   }catch (err) {
-//     console.error(err);
-//     res.status(500).json({ message: 'Failed to fetch farm plans', error: err }); 
-//   } 
-// };
 // Fetch cost templates for a specific crop
 const getTemplate = async (cropId) => {
-  return await prisma.costTemplate.findMany({
-    where: { cropId },
-    select: {
-      type: true,
-      stage: true,
-      description: true,
-      amount: true
-    }
-  });
+  const result = await query(
+    'SELECT type, stage, description, amount FROM cost_templates WHERE crop_id = $1',
+    [cropId]
+  );
+  return result.rows;
 };
 
 const getCosts = async (req, res) => {
@@ -108,10 +49,18 @@ const getCosts = async (req, res) => {
     const cropId = req.params.cropId;
     const costs = await getTemplate(cropId);
     const totalCosts = costs.reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
-    res.json({ totalCosts, costs });
+    
+    res.json({ 
+      success: true,
+      totalCosts, 
+      costs 
+    });
   } catch(err) {
     console.error(err);
-    res.status(500).json({ message: 'Failed to fetch costs', error: err });
+    res.status(500).json({ 
+      message: 'Failed to fetch costs', 
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
   }
 };
 
@@ -124,91 +73,29 @@ const getGroupedCosts = async (req, res) => {
       if (!acc[item.type]) {
         acc[item.type] = 0;
       }
-      acc[item.type] += item.amount;
+      acc[item.type] += parseFloat(item.amount || 0);
       return acc;
     }, {});
 
-    res.json(groupedCosts);
+    res.json({
+      success: true,
+      groupedCosts
+    });
   } catch(err) {
     console.error(err);
-    res.status(500).json({ message: 'Failed to group costs', error: err });
+    res.status(500).json({ 
+      message: 'Failed to group costs', 
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
   }
 };
 
-
-// const createFarmPlan = async (req, res) => {
-//   try {
-//     const {
-//       name,
-//       cropId,
-//       CropVarietyId,
-//       farmerId,
-//       plantingDate,
-//       gardenSizeInAcres,
-//       soilType,
-//       rainfall,
-//       fertilizerType,
-//       oneTimeCosts = [],
-//       seasonalCosts = [],
-//       investmentCosts = [],
-//     } = req.body;
-
-// // Step 1: Fetch crop variety details
-// if (!CropVarietyId) {
-//     console.error("❌ Missing cropVarietyId in request body");
-//     return res.status(400).json({ error: "Missing cropVarietyId" });
-//   }
-  
-//   const cropVariety = await prisma.cropVariety.findUnique({
-//     where: { id: req.body.CropVarietyId },
-//     include: { crop: true }
-//   });
-  
-//   if (!cropVariety) {
-//     return res.status(404).json({ error: "Crop variety not found" });
-//   }
-  
-//   const baseYieldPerAcre = cropVariety.estimatedYieldPerAcre || 1000; // fallback
-//   const adjustedYield = calculateEstimatedYield(baseYieldPerAcre, soilType, rainfall, fertilizerType);
-//   const estimatedRevenue = adjustedYield * (cropVariety.marketPricePerKg || 2.5);
-  
-//     // Calculate total costs
-//     const totalCosts = [...oneTimeCosts, ...seasonalCosts, ...investmentCosts]
-//       .reduce((sum, cost) => sum + (parseFloat(cost.amount) || 0), 0);
-
-//     const estimatedProfit = estimatedRevenue - totalCosts;
-
-//     // Step 3: Create farm plan
-//     const farmPlan = await prisma.farmPlan.create({
-//       data: {
-//         name,
-//         plantingDate: new Date(plantingDate),
-//         gardenSize: gardenSizeInAcres,
-//         estimatedYield: adjustedYield * gardenSizeInAcres,  // Total yield for all acres
-//         estimatedRevenue,
-//         estimatedProfit,
-//         farmer: { connect: { id: farmerId } },
-//         variety: { connect: { id: CropVarietyId } },
-//         costs: {
-//           create: [...oneTimeCosts, ...seasonalCosts, ...investmentCosts],
-//         },
-//       },
-//       include: {
-//         farmer: true,
-//         variety: { include: { crop: true } },
-//         costs: true
-//       }
-//     });
-
-//     res.status(201).json(farmPlan);
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({ message: "Failed to create farm plan", error: err });
-//   }
-// };
-
 const createFarmPlan = async (req, res) => {
+  const client = await getClient();
+  
   try {
+    await client.query('BEGIN');
+
     const {
       name,
       farmerId,
@@ -218,29 +105,54 @@ const createFarmPlan = async (req, res) => {
       soilType,
       rainfall,
       fertilizerType,
-      // stage,
       costs = [] // Allow for custom costs to be added
     } = req.body;
 
-    // Step 1: Fetch crop variety details
-    const cropVariety = await prisma.cropVariety.findUnique({
-      where: { id: CropVarietyId },
-      include: { crop: true }
-    });
+    // Validate required fields
+    if (!name || !farmerId || !CropVarietyId || !plantingDate || !gardenSizeInAcres) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ 
+        error: "Missing required fields: name, farmerId, CropVarietyId, plantingDate, gardenSizeInAcres" 
+      });
+    }
 
-    if (!cropVariety) {
+    // Step 1: Fetch crop variety details
+    const cropVarietyResult = await client.query(
+      `SELECT cv.id, cv.name, cv.yield_per_acre, cv.estimated_yield_per_acre, cv.market_price_per_kg, 
+              c.id as crop_id, c.name as crop_name
+       FROM crop_varieties cv
+       JOIN crops c ON cv.crop_id = c.id
+       WHERE cv.id = $1`,
+      [CropVarietyId]
+    );
+
+    if (cropVarietyResult.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ error: "Crop variety not found" });
     }
 
-    // Step 2: Calculate dynamic costs based on crop
+    const cropVariety = cropVarietyResult.rows[0];
+
+    // Step 2: Check if farmer exists
+    const farmerResult = await client.query(
+      'SELECT id FROM farmers WHERE id = $1',
+      [farmerId]
+    );
+
+    if (farmerResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: "Farmer not found" });
+    }
+
+    // Step 3: Calculate dynamic costs based on crop
     const { 
       ONE_TIME: oneTimeCosts, 
       SEASONAL: seasonalCosts, 
       INVESTMENTCOSTS: investmentCosts 
     } = await calculateCostsForPlan(CropVarietyId);
 
-    // Step 3: Calculate yield and financials
-    const baseYieldPerAcre = cropVariety.estimatedYieldPerAcre || 1000;
+    // Step 4: Calculate yield and financials
+    const baseYieldPerAcre = cropVariety.estimated_yield_per_acre || cropVariety.yield_per_acre || 1000;
     const adjustedYield = calculateEstimatedYield(
       baseYieldPerAcre, 
       soilType, 
@@ -248,7 +160,8 @@ const createFarmPlan = async (req, res) => {
       fertilizerType
     );
     
-    const estimatedRevenue = adjustedYield * (cropVariety.marketPricePerKg || 2.5);
+    const marketPricePerKg = cropVariety.market_price_per_kg || 2.5;
+    const estimatedRevenue = adjustedYield * gardenSizeInAcres * marketPricePerKg;
     
     // Combine dynamic and custom costs
     const allCosts = [
@@ -260,35 +173,86 @@ const createFarmPlan = async (req, res) => {
 
     const totalCosts = allCosts.reduce((sum, cost) => sum + (cost.amount || 0), 0);
     const estimatedProfit = estimatedRevenue - totalCosts;
+    const totalEstimatedYield = adjustedYield * gardenSizeInAcres;
 
-    // Step 4: Create farm plan
-    const farmPlan = await prisma.farmPlan.create({
-      data: {
-        name,
-        plantingDate: new Date(plantingDate),
-        gardenSize: gardenSizeInAcres,
-        estimatedYield: adjustedYield * gardenSizeInAcres,
-        estimatedRevenue,
-        estimatedProfit,
-        // stage,
-        farmer: { connect: { id: farmerId } },
-        variety: { connect: { id: CropVarietyId } },
-        costs: {
-          create: allCosts,
-        },
-      },
-      include: {
-        farmer: true,
-        variety: { include: { crop: true } },
-        costs: true
-      }
+    // Step 5: Create farm plan
+    const farmPlanResult = await client.query(
+      `INSERT INTO farm_plans (name, farmer_id, variety_id, planting_date, garden_size, soil_type, 
+                              rainfall, fertilizer_type, estimated_yield, estimated_revenue, 
+                              estimated_profit, created_at) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW()) 
+       RETURNING id, name, farmer_id as "farmerId", variety_id as "varietyId", planting_date as "plantingDate", 
+                garden_size as "gardenSize", soil_type as "soilType", rainfall, fertilizer_type as "fertilizerType",
+                estimated_yield as "estimatedYield", estimated_revenue as "estimatedRevenue", 
+                estimated_profit as "estimatedProfit", created_at as "createdAt"`,
+      [name, farmerId, CropVarietyId, plantingDate, gardenSizeInAcres, soilType, rainfall, 
+       fertilizerType, totalEstimatedYield, estimatedRevenue, estimatedProfit]
+    );
+
+    const farmPlan = farmPlanResult.rows[0];
+    const farmPlanId = farmPlan.id;
+
+    // Step 6: Create cost records
+    for (const cost of allCosts) {
+      await client.query(
+        `INSERT INTO farm_plan_costs (farm_plan_id, type, stage, description, amount, is_custom, created_at) 
+         VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+        [farmPlanId, cost.type, cost.stage, cost.description, cost.amount, cost.isCustom || false]
+      );
+    }
+
+    await client.query('COMMIT');
+
+    // Step 7: Fetch complete farm plan with relations
+    const completeFarmPlan = await getCompleteFarmPlan(farmPlanId, client);
+
+    res.status(201).json({
+      success: true,
+      message: "Farm plan created successfully",
+      farmPlan: completeFarmPlan
     });
 
-    res.status(201).json(farmPlan);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Failed to create farm plan", error: err.message });
+    await client.query('ROLLBACK');
+    console.error("Error creating farm plan:", err);
+    res.status(500).json({ 
+      message: "Failed to create farm plan", 
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
+  } finally {
+    client.release();
   }
+};
+
+// Helper function to get complete farm plan with relations
+const getCompleteFarmPlan = async (farmPlanId, client = null) => {
+  const queryFn = client ? client.query : query;
+
+  const farmPlanResult = await queryFn(
+    `SELECT fp.*, f.name as farmer_name, f.contact as farmer_contact,
+            cv.name as variety_name, cv.description as variety_description,
+            c.name as crop_name
+     FROM farm_plans fp
+     LEFT JOIN farmers f ON fp.farmer_id = f.id
+     LEFT JOIN crop_varieties cv ON fp.variety_id = cv.id
+     LEFT JOIN crops c ON cv.crop_id = c.id
+     WHERE fp.id = $1`,
+    [farmPlanId]
+  );
+
+  if (farmPlanResult.rows.length === 0) return null;
+
+  const farmPlan = farmPlanResult.rows[0];
+
+  // Get costs
+  const costsResult = await queryFn(
+    'SELECT id, type, stage, description, amount, is_custom as "isCustom", created_at FROM farm_plan_costs WHERE farm_plan_id = $1',
+    [farmPlanId]
+  );
+
+  farmPlan.costs = costsResult.rows;
+
+  return farmPlan;
 };
 
 const getFarmPlansByFarmer = async (req, res) => {
@@ -296,39 +260,61 @@ const getFarmPlansByFarmer = async (req, res) => {
     const { farmerId } = req.params;
     console.log("Fetching farm plans for farmer ID:", farmerId);
 
-    const plans = await prisma.farmPlan.findMany({
-      where: { farmerId },  // this is the foreign key in farmPlan
-      include: {
-        variety: {
-          include: { crop: true }
-        },
-        costs: true
-      },
-    });
+    // Check if farmer exists
+    const farmerCheck = await query(
+      'SELECT id FROM farmers WHERE id = $1',
+      [farmerId]
+    );
 
-    res.json(plans);
+    if (farmerCheck.rows.length === 0) {
+      return res.status(404).json({ 
+        message: "Farmer not found" 
+      });
+    }
+
+    const plansResult = await query(
+      `SELECT fp.*, cv.name as variety_name, cv.description as variety_description,
+              c.name as crop_name, c.description as crop_description
+       FROM farm_plans fp
+       LEFT JOIN crop_varieties cv ON fp.variety_id = cv.id
+       LEFT JOIN crops c ON cv.crop_id = c.id
+       WHERE fp.farmer_id = $1
+       ORDER BY fp.created_at DESC`,
+      [farmerId]
+    );
+
+    // Get costs for each plan
+    const plansWithCosts = await Promise.all(
+      plansResult.rows.map(async (plan) => {
+        const costsResult = await query(
+          'SELECT id, type, stage, description, amount, is_custom as "isCustom" FROM farm_plan_costs WHERE farm_plan_id = $1',
+          [plan.id]
+        );
+        
+        return {
+          ...plan,
+          costs: costsResult.rows
+        };
+      })
+    );
+
+    res.json({
+      success: true,
+      plans: plansWithCosts,
+      count: plansWithCosts.length
+    });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: 'Failed to fetch farm plans', error: err });
+    res.status(500).json({ 
+      message: 'Failed to fetch farm plans', 
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
   }
 };
 
-
-
-export  {
-    createFarmPlan,
-    getFarmPlansByFarmer,
-    getCosts,
-    getGroupedCosts
-  };
-  // 2900 kaiso
-  // 3300 super kaiso
-  // 3500 super grade 2
-  // 3800 grade 1
-
-  // plastic BaseWrapperForGoverning
-  // 1000 each size 
-  // 5kgs 550 each 200,000 printing 450 
-  // 10ks 630 each plate 220,000 printing 550
-  // 25kgs 800 each plate 250,000 printing 700
-  //50kg  1100 each plate 300,000 printing 950
+export {
+  createFarmPlan,
+  getFarmPlansByFarmer,
+  getCosts,
+  getGroupedCosts
+};

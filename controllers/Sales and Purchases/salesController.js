@@ -1,11 +1,7 @@
 // Import dependencies
-import { PrismaClient } from '@prisma/client';
-import { recordExists, updateProductQuantity } from '../../utils/dbUtils.js';
+import { query, getClient } from '../../config/database.js';
+import { updateProductQuantity } from '../../utils/dbUtils.js';
 // import { recordTransactionOnBlockchain } from '../utils/blockchain.js';
-
-const prisma = new PrismaClient();
-
-// Market Controller Functions
 
 /**
  * Fetch available biofortified crop listings
@@ -13,13 +9,28 @@ const prisma = new PrismaClient();
  */
 const getMarketListings = async (req, res) => {
   try {
-    const listings = await prisma.produce.findMany({
-      where: { status: 'HARVESTED' },
-      include: { farmer: true },
+    const listingsResult = await query(
+      `SELECT p.id, p.type, p.quantity, p.harvest_date as "harvestDate", 
+              p.quality_report as "qualityReport", p.status, p.created_at,
+              f.name as "farmerName", f.contact as "farmerContact", f.location as "farmerLocation"
+       FROM produce p
+       LEFT JOIN farmers f ON p.farmer_id = f.id
+       WHERE p.status = 'HARVESTED'
+       ORDER BY p.created_at DESC`
+    );
+
+    res.json({
+      success: true,
+      listings: listingsResult.rows,
+      count: listingsResult.rows.length
     });
-    res.json(listings);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Error fetching market listings:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch market listings',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
@@ -31,13 +42,38 @@ const getMarketListings = async (req, res) => {
 const groupFarmersByCrop = async (req, res) => {
   try {
     const { cropType } = req.body;
-    const groupedFarmers = await prisma.produce.findMany({
-      where: { type: cropType },
-      include: { farmer: true },
+
+    if (!cropType) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'cropType is required' 
+      });
+    }
+
+    const groupedFarmersResult = await query(
+      `SELECT p.id, p.type, p.quantity, p.harvest_date as "harvestDate", p.status,
+              f.id as "farmerId", f.name as "farmerName", f.contact as "farmerContact", 
+              f.location as "farmerLocation"
+       FROM produce p
+       LEFT JOIN farmers f ON p.farmer_id = f.id
+       WHERE p.type = $1
+       ORDER BY p.quantity DESC`,
+      [cropType]
+    );
+
+    res.json({
+      success: true,
+      cropType,
+      groupedFarmers: groupedFarmersResult.rows,
+      count: groupedFarmersResult.rows.length
     });
-    res.json({ cropType, groupedFarmers });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Error grouping farmers by crop:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to group farmers by crop',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
@@ -49,21 +85,80 @@ const groupFarmersByCrop = async (req, res) => {
  * @param {number} offerPrice - Offer price for the produce
  */
 const placeOffer = async (req, res) => {
+  const client = await getClient();
+  
   try {
+    await client.query('BEGIN');
+
     const { produceId, buyerId, offerPrice } = req.body;
-    const transaction = await prisma.transaction.create({
-      data: {
-        produceId,
-        buyerId,
-        offerPrice,
-        status: 'PENDING',
-      },
-    });
+
+    // Validate required fields
+    if (!produceId || !buyerId || !offerPrice) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ 
+        success: false,
+        error: 'Missing required fields: produceId, buyerId, offerPrice' 
+      });
+    }
+
+    // Check if produce exists
+    const produceCheck = await client.query(
+      'SELECT id FROM produce WHERE id = $1',
+      [produceId]
+    );
+
+    if (produceCheck.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ 
+        success: false,
+        error: 'Produce not found' 
+      });
+    }
+
+    // Check if buyer exists
+    const buyerCheck = await client.query(
+      'SELECT id FROM customers WHERE id = $1',
+      [buyerId]
+    );
+
+    if (buyerCheck.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ 
+        success: false,
+        error: 'Buyer not found' 
+      });
+    }
+
+    // Create transaction
+    const transactionResult = await client.query(
+      `INSERT INTO transactions (produce_id, buyer_id, offer_price, status, created_at) 
+       VALUES ($1, $2, $3, $4, NOW()) 
+       RETURNING id, produce_id as "produceId", buyer_id as "buyerId", offer_price as "offerPrice", status, created_at`,
+      [produceId, buyerId, offerPrice, 'PENDING']
+    );
+
+    const transaction = transactionResult.rows[0];
+
     // Record the offer on the blockchain for traceability
-    await recordTransactionOnBlockchain(transaction);
-    res.status(201).json(transaction);
+    // await recordTransactionOnBlockchain(transaction);
+
+    await client.query('COMMIT');
+
+    res.status(201).json({
+      success: true,
+      message: 'Offer placed successfully',
+      transaction
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    await client.query('ROLLBACK');
+    console.error('Error placing offer:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to place offer',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  } finally {
+    client.release();
   }
 };
 
@@ -75,179 +170,330 @@ const placeOffer = async (req, res) => {
 const getTransactionHistory = async (req, res) => {
   try {
     const { userId } = req.params;
-    const transactions = await prisma.transaction.findMany({
-      where: { buyerId: userId },
-      include: {
-        produce: { include: { farmer: true } },
-      },
+
+    const transactionsResult = await query(
+      `SELECT t.id, t.offer_price as "offerPrice", t.status, t.created_at,
+              p.type as "produceType", p.quantity, p.harvest_date as "harvestDate",
+              f.name as "farmerName", f.contact as "farmerContact"
+       FROM transactions t
+       LEFT JOIN produce p ON t.produce_id = p.id
+       LEFT JOIN farmers f ON p.farmer_id = f.id
+       WHERE t.buyer_id = $1
+       ORDER BY t.created_at DESC`,
+      [userId]
+    );
+
+    res.json({
+      success: true,
+      transactions: transactionsResult.rows,
+      count: transactionsResult.rows.length
     });
-    res.json(transactions);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Error fetching transaction history:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch transaction history',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
+// Product CRUD operations
 
-//Product Crud operations
-
-// const createProduct = async (req, res) => {
-//   try {
-//     const { name, price, units, quantity, farmerId, facilityId, transporterId } = req.body;
-
-//     const product = await prisma.product.create({
-//       data: {
-//         name,
-//         price,
-//         units,
-//         quantity,
-//         farmer: farmerId ? { connect: { id: farmerId } } : undefined,
-//         Processing_Facility: facilityId ? { connect: { id: facilityId } } : undefined,
-//         transporter: transporterId ? { connect: { id: transporterId } } : undefined,
-//       },
-//     });
-
-//     res.status(201).json(product);
-//   } catch (error) {
-//     res.status(500).json({ error: error.message });
-//   }
-// };
 const createProduct = async (req, res) => {
+  const client = await getClient();
+  
   try {
+    await client.query('BEGIN');
+
     const { name, price, units, quantity, farmerId, facilityId, transporterId } = req.body;
+
+    // Validate required fields
+    if (!name || !price || !units || !quantity) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ 
+        success: false,
+        error: 'Missing required fields: name, price, units, quantity' 
+      });
+    }
 
     // Check if farmer exists if farmerId is provided
     if (farmerId) {
-      const farmerExists = await prisma.farmer.findUnique({
-        where: { id: farmerId },
-      });
-      if (!farmerExists) {
-        return res.status(404).json({ error: "Farmer not found" });
+      const farmerExists = await client.query(
+        'SELECT id FROM farmers WHERE id = $1',
+        [farmerId]
+      );
+      if (farmerExists.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ 
+          success: false,
+          error: "Farmer not found" 
+        });
       }
     }
 
     // Check if facility exists if facilityId is provided
     if (facilityId) {
-      const facilityExists = await prisma.facility.findUnique({
-        where: { id: facilityId },
-      });
-      if (!facilityExists) {
-        return res.status(404).json({ error: "Facility not found" });
+      const facilityExists = await client.query(
+        'SELECT id FROM facilities WHERE id = $1',
+        [facilityId]
+      );
+      if (facilityExists.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ 
+          success: false,
+          error: "Facility not found" 
+        });
       }
     }
 
     // Check if transporter exists if transporterId is provided
     if (transporterId) {
-      const transporterExists = await prisma.transporter.findUnique({
-        where: { id: transporterId },
-      });
-      if (!transporterExists) {
-        return res.status(404).json({ error: "Transporter not found" });
+      const transporterExists = await client.query(
+        'SELECT id FROM transporters WHERE id = $1',
+        [transporterId]
+      );
+      if (transporterExists.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ 
+          success: false,
+          error: "Transporter not found" 
+        });
       }
     }
 
     // Create the product
-    const product = await prisma.product.create({
-      data: {
-        name,
-        price,
-        units,
-        quantity,
-        farmer: farmerId ? { connect: { id: farmerId } } : undefined,
-        Processing_Facility: facilityId ? { connect: { id: facilityId } } : undefined,
-        transporter: transporterId ? { connect: { id: transporterId } } : undefined,
-      },
-    });
+    const productResult = await client.query(
+      `INSERT INTO products (name, price, units, quantity, farmer_id, facility_id, transporter_id, created_at) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW()) 
+       RETURNING id, name, price, units, quantity, farmer_id as "farmerId", 
+                facility_id as "facilityId", transporter_id as "transporterId", created_at`,
+      [name, price, units, quantity, farmerId, facilityId, transporterId]
+    );
 
-    res.status(201).json(product);
+    const product = productResult.rows[0];
+
+    await client.query('COMMIT');
+
+    res.status(201).json({
+      success: true,
+      message: 'Product created successfully',
+      product
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    await client.query('ROLLBACK');
+    console.error('Error creating product:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to create product',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  } finally {
+    client.release();
   }
 };
 
 const getAllProducts = async (req, res) => {
   try {
-    const products = await prisma.product.findMany({
-      include: {
-        farmer: true,
-        Processing_Facility: true,
-        transporter: true,
-      },
+    const productsResult = await query(
+      `SELECT p.id, p.name, p.price, p.units, p.quantity, p.created_at,
+              f.name as "farmerName", f.contact as "farmerContact",
+              fac.name as "facilityName", fac.location as "facilityLocation",
+              t.name as "transporterName", t.contact as "transporterContact"
+       FROM products p
+       LEFT JOIN farmers f ON p.farmer_id = f.id
+       LEFT JOIN facilities fac ON p.facility_id = fac.id
+       LEFT JOIN transporters t ON p.transporter_id = t.id
+       ORDER BY p.created_at DESC`
+    );
+
+    res.json({
+      success: true,
+      products: productsResult.rows,
+      count: productsResult.rows.length
     });
-    res.json(products);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Error fetching products:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch products',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
 const getProductById = async (req, res) => {
   try {
     const { id } = req.params;
-    const product = await prisma.product.findUnique({
-      where: { id },
-      include: {
-        farmer: true,
-        Processing_Facility: true,
-        transporter: true,
-      },
-    });
-    if (!product) {
-      return res.status(404).json({ error: 'Product not found' });
+
+    const productResult = await query(
+      `SELECT p.id, p.name, p.price, p.units, p.quantity, p.created_at,
+              f.name as "farmerName", f.contact as "farmerContact",
+              fac.name as "facilityName", fac.location as "facilityLocation",
+              t.name as "transporterName", t.contact as "transporterContact"
+       FROM products p
+       LEFT JOIN farmers f ON p.farmer_id = f.id
+       LEFT JOIN facilities fac ON p.facility_id = fac.id
+       LEFT JOIN transporters t ON p.transporter_id = t.id
+       WHERE p.id = $1`,
+      [id]
+    );
+
+    if (productResult.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'Product not found' 
+      });
     }
-    res.json(product);
+
+    const product = productResult.rows[0];
+
+    res.json({
+      success: true,
+      product
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Error fetching product:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch product',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
 const updateProduct = async (req, res) => {
+  const client = await getClient();
+  
   try {
+    await client.query('BEGIN');
+
     const { id } = req.params;
     const { name, price, units, quantity, farmerId, facilityId, transporterId } = req.body;
-    const product = await prisma.product.update({
-      where: { id },
-      data: {
-        name,
-        price,
-        units,
-        quantity,
-        farmer: farmerId ? { connect: { id: farmerId } } : undefined,
-        Processing_Facility: facilityId ? { connect: { id: facilityId } } : undefined,
-        transporter: transporterId ? { connect: { id: transporterId } } : undefined,
-      },
+
+    // Check if product exists
+    const productCheck = await client.query(
+      'SELECT id FROM products WHERE id = $1',
+      [id]
+    );
+
+    if (productCheck.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ 
+        success: false,
+        error: 'Product not found' 
+      });
+    }
+
+    // Update product
+    const updateResult = await client.query(
+      `UPDATE products 
+       SET name = COALESCE($1, name), 
+           price = COALESCE($2, price), 
+           units = COALESCE($3, units), 
+           quantity = COALESCE($4, quantity),
+           farmer_id = COALESCE($5, farmer_id),
+           facility_id = COALESCE($6, facility_id),
+           transporter_id = COALESCE($7, transporter_id),
+           updated_at = NOW() 
+       WHERE id = $8 
+       RETURNING id, name, price, units, quantity, farmer_id as "farmerId", 
+                facility_id as "facilityId", transporter_id as "transporterId", updated_at`,
+      [name, price, units, quantity, farmerId, facilityId, transporterId, id]
+    );
+
+    const updatedProduct = updateResult.rows[0];
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      message: 'Product updated successfully',
+      product: updatedProduct
     });
-    res.json(product);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    await client.query('ROLLBACK');
+    console.error('Error updating product:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to update product',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  } finally {
+    client.release();
   }
 };
 
 const deleteProduct = async (req, res) => {
+  const client = await getClient();
+  
   try {
+    await client.query('BEGIN');
+
     const { id } = req.params;
 
-    // Delete the product
-    await prisma.product.delete({
-      where: { id },
-    });
+    // Check if product exists
+    const productCheck = await client.query(
+      'SELECT id FROM products WHERE id = $1',
+      [id]
+    );
 
-    // Success message for delete
-    res.status(200).json({ message: "Product deleted successfully" });
+    if (productCheck.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ 
+        success: false,
+        error: 'Product not found' 
+      });
+    }
+
+    // Delete the product
+    await client.query(
+      'DELETE FROM products WHERE id = $1',
+      [id]
+    );
+
+    await client.query('COMMIT');
+
+    res.status(200).json({ 
+      success: true,
+      message: "Product deleted successfully" 
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    await client.query('ROLLBACK');
+    console.error('Error deleting product:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to delete product',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  } finally {
+    client.release();
   }
 };
 
-
 const createTransaction = async (req, res) => {
+  const client = await getClient();
+  
   try {
-    const { buyerId, products = [], produce = [], services = [], inputs = [], serviceOffering = [] } = req.body;
+    await client.query('BEGIN');
+
+    const { buyerId, products = [], produce = [], inputs = [], serviceOffering = [] } = req.body;
 
     // Validate buyer exists
-    const buyer = await prisma.customer.findUnique({ where: { id: buyerId } });
-    if (!buyer) return res.status(404).json({ error: "Customer not found" });
+    const buyerResult = await client.query(
+      'SELECT id FROM customers WHERE id = $1',
+      [buyerId]
+    );
+
+    if (buyerResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ 
+        success: false,
+        error: "Customer not found" 
+      });
+    }
 
     let totalAmount = 0;
-
     const processedItems = {
       products: [],
       produce: [],
@@ -257,9 +503,21 @@ const createTransaction = async (req, res) => {
 
     // Process Products
     for (const item of products) {
-      const product = await prisma.product.findUnique({ where: { id: item.productId } });
-      if (!product) throw new Error(`Product not found: ${item.productId}`);
-      if (product.quantity < item.quantity) throw new Error(`Insufficient stock for ${product.name}`);
+      const productResult = await client.query(
+        'SELECT id, name, price, quantity FROM products WHERE id = $1',
+        [item.productId]
+      );
+
+      if (productResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        throw new Error(`Product not found: ${item.productId}`);
+      }
+
+      const product = productResult.rows[0];
+      if (product.quantity < item.quantity) {
+        await client.query('ROLLBACK');
+        throw new Error(`Insufficient stock for ${product.name}`);
+      }
 
       const itemTotal = product.price * item.quantity;
       totalAmount += itemTotal;
@@ -273,9 +531,19 @@ const createTransaction = async (req, res) => {
 
     // Process Produce
     for (const item of produce) {
-      const produceItem = await prisma.produce.findUnique({ where: { id: item.produceId } });
-      if (!produceItem) throw new Error(`Produce not found: ${item.produceId}`);
+      const produceResult = await client.query(
+        'SELECT id, type, price, quantity, status FROM produce WHERE id = $1',
+        [item.produceId]
+      );
+
+      if (produceResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        throw new Error(`Produce not found: ${item.produceId}`);
+      }
+
+      const produceItem = produceResult.rows[0];
       if (!['HARVESTED', 'PROCESSED', 'DELIVERED'].includes(produceItem.status) || produceItem.quantity < item.quantity) {
+        await client.query('ROLLBACK');
         throw new Error(`Produce not available or quantity too low`);
       }
 
@@ -291,9 +559,21 @@ const createTransaction = async (req, res) => {
 
     // Process Inputs
     for (const item of inputs) {
-      const input = await prisma.farmInput.findUnique({ where: { id: item.inputId } });
-      if (!input) throw new Error(`Input not found: ${item.inputId}`);
-      if (input.quantity < item.quantity) throw new Error(`Insufficient stock for ${input.name}`);
+      const inputResult = await client.query(
+        'SELECT id, name, price, quantity FROM farm_inputs WHERE id = $1',
+        [item.inputId]
+      );
+
+      if (inputResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        throw new Error(`Input not found: ${item.inputId}`);
+      }
+
+      const input = inputResult.rows[0];
+      if (input.quantity < item.quantity) {
+        await client.query('ROLLBACK');
+        throw new Error(`Insufficient stock for ${input.name}`);
+      }
 
       const itemTotal = input.price * item.quantity;
       totalAmount += itemTotal;
@@ -301,103 +581,73 @@ const createTransaction = async (req, res) => {
       processedItems.inputs.push({
         inputId: input.id,
         quantity: item.quantity,
-        price: input.pricez
+        price: input.price
       });
     }
 
-    // Process Service Offering
-    for (const item of serviceOffering) {
-      const offering = await prisma.serviceOffering.findUnique({
-        where: { id: item.offeringId },
-        include: { service: true }
-      });
+    // Create transaction
+    const transactionResult = await client.query(
+      `INSERT INTO transactions (buyer_id, total_amount, status, payment_method, created_at) 
+       VALUES ($1, $2, $3, $4, NOW()) 
+       RETURNING id, buyer_id as "buyerId", total_amount as "totalAmount", status, payment_method as "paymentMethod", created_at`,
+      [buyerId, totalAmount, 'PENDING', 'CASH']
+    );
 
-      if (!offering) throw new Error(`Service offering not found: ${item.offeringId}`);
-      if (!offering.isActive) throw new Error(`Service offering is inactive`);
-      if (offering.minQuantity > (item.quantity || 1)) {
-        throw new Error(`Minimum quantity not met for ${offering.service.name}`);
-      }
+    const transaction = transactionResult.rows[0];
+    const transactionId = transaction.id;
 
-      const itemTotal = offering.rate * (item.quantity || 1);
-      totalAmount += itemTotal;
+    // Create transaction items
+    for (const item of processedItems.products) {
+      await client.query(
+        `INSERT INTO transaction_products (transaction_id, product_id, quantity, price) 
+         VALUES ($1, $2, $3, $4)`,
+        [transactionId, item.productId, item.quantity, item.price]
+      );
 
-      processedItems.serviceOffering.push({
-        offeringId: offering.id,
-        serviceId: offering.serviceId,
-        providerId: offering.serviceProviderId,
-        quantity: item.quantity || 1,
-        rate: offering.rate,
-        notes: item.notes || offering.notes
-      });
+      // Update product quantity
+      await client.query(
+        'UPDATE products SET quantity = quantity - $1 WHERE id = $2',
+        [item.quantity, item.productId]
+      );
     }
 
-    if (isNaN(totalAmount)) throw new Error("Invalid total amount calculation");
+    for (const item of processedItems.produce) {
+      await client.query(
+        `INSERT INTO transaction_produce (transaction_id, produce_id, quantity, price) 
+         VALUES ($1, $2, $3, $4)`,
+        [transactionId, item.produceId, item.quantity, item.price]
+      );
 
-    const transaction = await prisma.$transaction(async (prisma) => {
-      const newTransaction = await prisma.transaction.create({
-        data: {
-          buyer: { connect: { id: buyerId } },
-          totalAmount,
-          status: "PENDING",
-          paymentMethod: "CASH",
-          ...(processedItems.products.length > 0 && {
-            products: { connect: processedItems.products.map(p => ({ id: p.productId })) }
-          }),
-          ...(processedItems.produce.length > 0 && {
-            produce: { connect: processedItems.produce.map(p => ({ id: p.produceId })) }
-          }),
-          ...(processedItems.inputs.length > 0 && {
-            FarmInput: { connect: processedItems.inputs.map(i => ({ id: i.inputId })) }
-          }),
-          ...(processedItems.serviceOffering.length > 0 && {
-            serviceOfferings: {
-              create: processedItems.serviceOffering.map(s => ({
-                offeringId: s.offeringId,
-                providerId: s.providerId,
-                serviceId: s.serviceId,
-                quantity: s.quantity,
-                rate: s.rate,
-                notes: s.notes
-              }))
-            }
-          })
-        },
-        include: {
-          buyer: true,
-          products: true,
-          produce: true,
-          FarmInput: true,
-          // serviceOffering: true
-        }
-      });
+      // Update produce quantity and status
+      const newQuantity = await client.query(
+        'SELECT quantity FROM produce WHERE id = $1',
+        [item.produceId]
+      );
 
-      // Update stocks
-      await Promise.all([
-        ...processedItems.products.map(item =>
-          prisma.product.update({
-            where: { id: item.productId },
-            data: { quantity: { decrement: item.quantity } }
-          })
-        ),
-        ...processedItems.produce.map(item =>
-          prisma.produce.update({
-            where: { id: item.produceId },
-            data: {
-              quantity: { decrement: item.quantity },
-              status: item.quantity <= 0 ? "DELIVERED" : "HARVESTED"
-            }
-          })
-        ),
-        ...processedItems.inputs.map(item =>
-          prisma.farmInput.update({
-            where: { id: item.inputId },
-            data: { quantity: { decrement: item.quantity } }
-          })
-        )
-      ]);
+      const remainingQuantity = newQuantity.rows[0].quantity - item.quantity;
+      const newStatus = remainingQuantity <= 0 ? 'DELIVERED' : 'HARVESTED';
 
-      return newTransaction;
-    });
+      await client.query(
+        'UPDATE produce SET quantity = $1, status = $2 WHERE id = $3',
+        [remainingQuantity, newStatus, item.produceId]
+      );
+    }
+
+    for (const item of processedItems.inputs) {
+      await client.query(
+        `INSERT INTO transaction_inputs (transaction_id, input_id, quantity, price) 
+         VALUES ($1, $2, $3, $4)`,
+        [transactionId, item.inputId, item.quantity, item.price]
+      );
+
+      // Update input quantity
+      await client.query(
+        'UPDATE farm_inputs SET quantity = quantity - $1 WHERE id = $2',
+        [item.quantity, item.inputId]
+      );
+    }
+
+    await client.query('COMMIT');
 
     res.status(201).json({
       success: true,
@@ -415,255 +665,320 @@ const createTransaction = async (req, res) => {
     });
 
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error("Transaction Error:", error);
     res.status(500).json({
+      success: false,
       error: "Transaction failed",
       message: error.message,
-      ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
+      ...(process.env.NODE_ENV === 'development' && { details: error.message })
     });
+  } finally {
+    client.release();
   }
 };
 
 const getAllTransactions = async (req, res) => {
   try {
-    const transactions = await prisma.transaction.findMany({
-      include: {
-        products: true,
-        buyer: true,
-      },
+    const transactionsResult = await query(
+      `SELECT t.id, t.total_amount as "totalAmount", t.status, t.payment_method as "paymentMethod", t.created_at,
+              c.name as "buyerName", c.contact as "buyerContact"
+       FROM transactions t
+       LEFT JOIN customers c ON t.buyer_id = c.id
+       ORDER BY t.created_at DESC`
+    );
+
+    res.json({
+      success: true,
+      transactions: transactionsResult.rows,
+      count: transactionsResult.rows.length
     });
-    res.json(transactions);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Error fetching transactions:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch transactions',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
 const getTransactionById = async (req, res) => {
   try {
     const { id } = req.params;
+
     // Fetch the transaction
-    const transaction = await prisma.transaction.findUnique({
-      where: { id },
-      include: {
-        buyer: true, // Include buyer details
-        products: true, // Include products
-      },
+    const transactionResult = await query(
+      `SELECT t.id, t.total_amount as "totalAmount", t.status, t.payment_method as "paymentMethod", t.created_at,
+              c.name as "buyerName", c.contact as "buyerContact"
+       FROM transactions t
+       LEFT JOIN customers c ON t.buyer_id = c.id
+       WHERE t.id = $1`,
+      [id]
+    );
+
+    if (transactionResult.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false,
+        error: "Transaction not found" 
+      });
+    }
+
+    const transaction = transactionResult.rows[0];
+
+    // Fetch transaction items
+    const [products, produce, inputs] = await Promise.all([
+      query(
+        `SELECT p.id, p.name, tp.quantity, tp.price
+         FROM transaction_products tp
+         LEFT JOIN products p ON tp.product_id = p.id
+         WHERE tp.transaction_id = $1`,
+        [id]
+      ),
+      query(
+        `SELECT pr.id, pr.type, tpr.quantity, tpr.price
+         FROM transaction_produce tpr
+         LEFT JOIN produce pr ON tpr.produce_id = pr.id
+         WHERE tpr.transaction_id = $1`,
+        [id]
+      ),
+      query(
+        `SELECT fi.id, fi.name, ti.quantity, ti.price
+         FROM transaction_inputs ti
+         LEFT JOIN farm_inputs fi ON ti.input_id = fi.id
+         WHERE ti.transaction_id = $1`,
+        [id]
+      )
+    ]);
+
+    transaction.products = products.rows;
+    transaction.produce = produce.rows;
+    transaction.inputs = inputs.rows;
+
+    res.json({
+      success: true,
+      transaction
     });
-
-    // If transaction is not found, return a 404 error
-    if (!transaction) {
-      return res.status(404).json({ error: "Transaction not found" });
-    }
-
-    console.log("Transaction:", transaction); // Debugging: Log the transaction
-
-    // Resolve the subject based on the type (if subjectId and type exist)
-    let subject = null;
-    if (transaction.subjectId && transaction.type) {
-      if (transaction.type === "PRODUCT") {
-        subject = await prisma.product.findUnique({
-          where: { id: transaction.subjectId },
-        });
-      } else if (transaction.type === "PRODUCE") {
-        subject = await prisma.produce.findUnique({
-          where: { id: transaction.subjectId },
-        });
-      } else {
-        console.warn("Invalid transaction type:", transaction.type); // Debugging: Log invalid type
-        return res.status(400).json({ error: `Invalid transaction type: ${transaction.type}` });
-      }
-
-      if (!subject) {
-        console.warn("Subject not found for transaction:", transaction.id); // Debugging: Log missing subject
-        return res.status(404).json({ error: "Subject not found" });
-      }
-    } else {
-      console.warn("Missing subjectId or type in transaction:", transaction.id); // Debugging: Log missing fields
-    }
-
-    // Combine the transaction with the resolved subject
-    const response = {
-      ...transaction,
-      subject: subject || null, // Set subject to null if not found
-    };
-
-    res.json(response);
   } catch (error) {
-    console.error("Error fetching transaction:", error); // Debugging: Log the error
-    res.status(500).json({ error: error.message });
+    console.error("Error fetching transaction:", error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch transaction',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
-const getfarmerTransactions = async (req, res) => {
+
+const getFarmerTransactions = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Fetch the farmer's transactions
-    const getFarmerData = async (id) => {
-      return await prisma.farmer.findUnique({
-        where: { id },
-        include: {
-          products: {
-            include: {
-              transactions: true,
-            },
-          },
-          produce: {
-            include: {
-              transactions: true,
-            },
-          },
-        },
+    // Check if farmer exists
+    const farmerResult = await query(
+      'SELECT id, name FROM farmers WHERE id = $1',
+      [id]
+    );
+
+    if (farmerResult.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Farmer not found' 
       });
-    };
-
-    const farmerData = await getFarmerData(id);
-
-    if (!farmerData) {
-      return res.status(404).json({ message: 'Farmer not found' });
     }
 
-    // Extract transactions from products and produce
-    const transactions = [
-      ...farmerData.products.flatMap(product => product.transactions),
-      ...farmerData.produce.flatMap(produce => produce.transactions),
-    ];
+    // Get transactions from farmer's products
+    const productTransactions = await query(
+      `SELECT DISTINCT t.*
+       FROM transactions t
+       JOIN transaction_products tp ON t.id = tp.transaction_id
+       JOIN products p ON tp.product_id = p.id
+       WHERE p.farmer_id = $1`,
+      [id]
+    );
+
+    // Get transactions from farmer's produce
+    const produceTransactions = await query(
+      `SELECT DISTINCT t.*
+       FROM transactions t
+       JOIN transaction_produce tpr ON t.id = tpr.transaction_id
+       JOIN produce pr ON tpr.produce_id = pr.id
+       WHERE pr.farmer_id = $1`,
+      [id]
+    );
+
+    const transactions = [...productTransactions.rows, ...produceTransactions.rows];
 
     if (transactions.length === 0) {
-      return res.status(200).json({ message: 'No transactions found', transactions: [] });
+      return res.status(200).json({ 
+        success: true,
+        message: 'No transactions found', 
+        transactions: [] 
+      });
     }
 
-    res.status(200).json(transactions);
+    res.status(200).json({
+      success: true,
+      transactions,
+      count: transactions.length
+    });
   } catch (error) {
     console.error('Error fetching farmer transactions:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ 
+      success: false,
+      message: 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
-
 
 const getTransactionsByCustomerId = async (req, res) => {
   const { id } = req.params;
   
-    try {
-      const transactions = await prisma.transaction.findMany({
-        where: { id},
-        include: { products: true }, // Include products associated with the transaction
-      });
-  
-      if (!transactions || transactions.length === 0) {
-        return res.status(404).json({ message: 'No transactions found for this customer' });
-      }
-  
-      res.status(200).json(transactions);
-    } catch (err) { 
-      console.error('Error details:', err); // Log error for debugging
-      res.status(500).send('Error fetching transactions');
-    }
-  }
-const updateTransaction = async (req, res) => {
   try {
+    const transactionsResult = await query(
+      `SELECT t.id, t.total_amount as "totalAmount", t.status, t.payment_method as "paymentMethod", t.created_at
+       FROM transactions t
+       WHERE t.buyer_id = $1
+       ORDER BY t.created_at DESC`,
+      [id]
+    );
+
+    if (transactionsResult.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'No transactions found for this customer' 
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      transactions: transactionsResult.rows,
+      count: transactionsResult.rows.length
+    });
+  } catch (error) {
+    console.error('Error fetching customer transactions:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Error fetching transactions',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+const updateTransaction = async (req, res) => {
+  const client = await getClient();
+  
+  try {
+    await client.query('BEGIN');
+
     const { id } = req.params;
     const { status } = req.body;
 
     // Validate status
     const validStatuses = ["PENDING", "COMPLETED", "CANCELLED"];
     if (!validStatuses.includes(status)) {
-      return res.status(400).json({ error: "Invalid status" });
+      await client.query('ROLLBACK');
+      return res.status(400).json({ 
+        success: false,
+        error: "Invalid status" 
+      });
+    }
+
+    // Check if transaction exists
+    const transactionCheck = await client.query(
+      'SELECT id FROM transactions WHERE id = $1',
+      [id]
+    );
+
+    if (transactionCheck.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ 
+        success: false,
+        error: 'Transaction not found' 
+      });
     }
 
     // Update the transaction
-    const transaction = await prisma.transaction.update({
-      where: { id },
-      data: { status },
-    });
+    const updateResult = await client.query(
+      `UPDATE transactions 
+       SET status = $1, updated_at = NOW() 
+       WHERE id = $2 
+       RETURNING id, status, updated_at`,
+      [status, id]
+    );
 
-    res.json(transaction);
+    const transaction = updateResult.rows[0];
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      message: 'Transaction updated successfully',
+      transaction
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    await client.query('ROLLBACK');
+    console.error('Error updating transaction:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to update transaction',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  } finally {
+    client.release();
   }
 };
 
-// const deleteTransaction = async (req, res) => {
-//   try {
-//     const { id } = req.params;
-//     await prisma.transaction.delete({
-//       where: { id },
-//     });
-//     res.status(204).send();
-//   } catch (error) {
-//     res.status(500).json({ error: error.message });
-//   }
-// };
-// const deleteTransaction = async (req, res) => {
-//   try {
-//     const { id } = req.params;
-
-//     // Fetch the transaction to get the product details
-//     const transaction = await prisma.transaction.findUnique({
-//       where: { id },
-//       include: {
-//         products: true,
-//       },
-//     });
-//     if (!transaction) {
-//       return res.status(404).json({ error: "Transaction not found" });
-//     }
-
-//     // Restore product quantities
-//     for (const product of transaction.products) {
-//       await prisma.product.update({
-//         where: { id: product.id },
-//         data: {
-//           quantity: {
-//             increment: product.quantity,
-//           },
-//         },
-//       });
-//     }
-
-//     // Delete the transaction
-//     await prisma.transaction.delete({
-//       where: { id },
-//     });
-
-//     res.status(200).json({ message: "Transaction deleted successfully" });
-//   } catch (error) {
-//     res.status(500).json({ error: error.message });
-//   }
-// };
-
 const deleteTransaction = async (req, res) => {
+  const client = await getClient();
+  
   try {
+    await client.query('BEGIN');
+
     const { id } = req.params;
 
     // Fetch the transaction to get product details
-    const transaction = await prisma.transaction.findUnique({
-      where: { id },
-      include: { products: true },
-    });
+    const transactionResult = await query(
+      `SELECT tp.product_id, tp.quantity
+       FROM transaction_products tp
+       WHERE tp.transaction_id = $1`,
+      [id]
+    );
 
-    if (!transaction) {
-      return res.status(404).json({ error: "Transaction not found" });
+    if (transactionResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ 
+        success: false,
+        error: "Transaction not found" 
+      });
     }
 
-    // Use Prisma transaction for atomicity
-    await prisma.$transaction(async (prisma) => {
-      // Restore product quantities
-      for (const product of transaction.products) {
-        await updateProductQuantity(product.id, product.quantity);
-      }
+    // Restore product quantities
+    for (const item of transactionResult.rows) {
+      await updateProductQuantity(item.product_id, item.quantity);
+    }
 
-      // Delete the transaction
-      await prisma.transaction.delete({ where: { id } });
+    // Delete the transaction
+    await client.query('DELETE FROM transactions WHERE id = $1', [id]);
+
+    await client.query('COMMIT');
+
+    res.status(200).json({ 
+      success: true,
+      message: "Transaction deleted successfully" 
     });
-
-    res.status(200).json({ message: "Transaction deleted successfully" });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    await client.query('ROLLBACK');
+    console.error('Error deleting transaction:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to delete transaction',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  } finally {
+    client.release();
   }
 };
-
-
-
 
 export default {
   getMarketListings,
@@ -680,12 +995,6 @@ export default {
   getTransactionById,
   updateTransaction,
   deleteTransaction,
-  getfarmerTransactions,
+  getFarmerTransactions,
   getTransactionsByCustomerId
-  // createFarmInput,
-  // getAllFarmInputs,
-  // getFarmInputById,
-  // updateFarmInput,
-  // deleteFarmInput,
-
 };

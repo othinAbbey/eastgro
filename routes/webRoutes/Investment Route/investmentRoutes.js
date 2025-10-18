@@ -12,7 +12,6 @@ import {
   closeInvestment,
   getAllInvestments,
   updateInvestmentStatus,
-  processPayout
 } from '../../../controllers/Traders/investment.js';
 
 import { authenticateUser } from '../../../middleware/authMiddleware.js';
@@ -37,6 +36,6 @@ router.patch('/:id/close', closeInvestment);
 // Admin routes
 router.get('/admin/all', getAllInvestments);
 router.patch('/admin/:id/status', updateInvestmentStatus);
-router.patch('/admin/payouts/:payoutId/process', processPayout);
+router.patch('/admin/payouts/:payoutId/process', requestPayout);
 
 export default router;

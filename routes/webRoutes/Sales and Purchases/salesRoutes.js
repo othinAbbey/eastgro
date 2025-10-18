@@ -147,7 +147,7 @@ router.get('/provider/:providerId/bookings',
 );
 
 // Get farmer transactions
-router.get('/farmer/:id/transactions', salesController.getfarmerTransactions);
+router.get('/farmer/:id/transactions', salesController.getFarmerTransactions);
 // Get Customer transactions
 router.get('/customer/:id/transactions', salesController.getTransactionsByCustomerId);
 

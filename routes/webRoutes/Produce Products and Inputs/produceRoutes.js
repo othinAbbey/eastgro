@@ -13,10 +13,10 @@
 
 import express from 'express';
 // import produceController from '../../controllers/Sales and Purchases/produceController.js';
-import {createProduce,getProduce,getProduceList} from '../../../controllers/Produce Products and Inputs/produceController.js';
+import {registerProduce,getProduce,getProduceList} from '../../../controllers/Produce Products and Inputs/produceController.js';
 const router = express.Router();
 
-router.post('/', createProduce);
+router.post('/', registerProduce);
 router.get('/', getProduce);
 router.get('/list', getProduceList);
 

@@ -3,20 +3,20 @@ import express from 'express';
 const router = express.Router();
 import {
  
-  register, healthCheck, getUsers
-  // login,
-  // getProfile,
-  // updateProfile,
-  // newPassword,
-  // getAllUsers,
-  // getUserById,
-  // updatedUser,
-  // deleteUser,
-  // requestPasswordReset,
-  // resetPassword,
-  // getUsersByRole,
-  // countUsersByRole,
-  // searchUsersByRole
+  register, 
+  login,
+  getProfile,
+  updateProfile,
+  newPassword,
+  getUsers,
+  getUserById,
+  updatedUser,
+  deleteUser,
+  requestPasswordReset,
+  resetPassword,
+  getUsersByRole,
+  countUsersByRole,
+  searchUsersByRole
 } from "../../../controllers/User Magement/userController.js"; // Import user controller functions
 // import userController from '../../../controllers/User Magement/userController.js'; // Import user controller functions
 // Import authentication middleware
@@ -35,7 +35,7 @@ import {
 
 // Public routes (no authentication required)
 router.post('/register', register);
-router.get('/health', healthCheck);
+// router.get('/health', healthCheck);
 router.get('/users', getUsers);
 // router.post('/login',authLimiter, login);
 // router.post('/request-password-reset', requestPasswordReset);
