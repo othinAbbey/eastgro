@@ -251,16 +251,16 @@ const register = async (req, res) => {
     }
 
     // Handle connection errors specifically
-    if (error.message.includes('Connection terminated') || 
-        error.message.includes('ECONNRESET') || 
-        error.message.includes('connection') ||
-        error.code === 'ECONNRESET') {
-      return res.status(503).json({ 
-        success: false,
-        error: 'Database connection issue. Please try again.',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined
-      });
-    }
+    // if (error.message.includes('Connection terminated') || 
+    //     error.message.includes('ECONNRESET') || 
+    //     error.message.includes('connection') ||
+    //     error.code === 'ECONNRESET') {
+    //   return res.status(503).json({ 
+    //     success: false,
+    //     error: 'Database connection issue. Please try again.',
+    //     details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    //   });
+    // }
 
     return res.status(500).json({ 
       success: false,
