@@ -1,268 +1,110 @@
-// import pkg from 'pg';
-// const { Pool } = pkg;
-// import dotenv from 'dotenv';
-
-// dotenv.config();
-
-// // Determine environment
-// const isProduction = process.env.NODE_ENV === 'production';
-// const isRender = process.env.RENDER || process.env.NODE_ENV === 'production';
-
-// // Enhanced pool configuration for Render
-// const poolConfig = {
-//   connectionString: process.env.DATABASE_URL,
-  
-//   // SSL configuration - critical for Render
-//   ssl: isRender ? { 
-//     rejectUnauthorized: false 
-//   } : false,
-  
-//   // Connection pool settings optimized for Render
-//   max: 15, // Increased for better concurrency
-//   idleTimeoutMillis: 30000, // Reduced from 300000 to 30 seconds
-//   connectionTimeoutMillis: 10000, // 10 second connection timeout
-//   maxUses: 7500, // Close a client after 7500 queries
-//   allowExitOnIdle: false, // Keep connections alive
-// };
-
-// // Create pool with error handling
-// const pool = new Pool(poolConfig);
-
-// // Enhanced event listeners
-// pool.on('connect', (client) => {
-//   console.log('✅ New database client connected');
-// });
-
-// pool.on('acquire', (client) => {
-//   console.log('🔗 Database client acquired from pool');
-// });
-
-// pool.on('remove', (client) => {
-//   console.log('❌ Database client removed from pool');
-// });
-
-// pool.on('error', (err, client) => {
-//   console.error('💥 Unexpected error on idle database client:', err);
-  
-//   // Don't crash the app on production, just log the error
-//   if (!isProduction) {
-//     process.exit(-1);
-//   }
-// });
-
-// // Test database connection on startup
-// async function testConnection() {
-//   let client;
-//   try {
-//     client = await pool.connect();
-//     const result = await client.query('SELECT NOW() as current_time, version() as version');
-//     console.log('🎯 Database connection test successful:');
-//     console.log('   📅 Time:', result.rows[0].current_time);
-//     console.log('   🗄️  Database:', process.env.DATABASE_URL?.split('/').pop() || 'Unknown');
-    
-//     // Test basic query
-//     const userTableCheck = await client.query(`
-//       SELECT EXISTS (
-//         SELECT FROM information_schema.tables 
-//         WHERE table_schema = 'public' 
-//         AND table_name = 'users'
-//       );
-//     `);
-    
-//     console.log('   👥 Users table exists:', userTableCheck.rows[0].exists);
-    
-//   } catch (error) {
-//     console.error('💥 Database connection test failed:', error.message);
-    
-//     // Provide helpful error messages
-//     if (error.code === 'ECONNREFUSED') {
-//       console.error('   🔌 Check if PostgreSQL is running and DATABASE_URL is correct');
-//     } else if (error.code === '28P01') {
-//       console.error('   🔑 Authentication failed - check database credentials');
-//     } else if (error.message.includes('SSL')) {
-//       console.error('   🔐 SSL connection issue - check SSL configuration');
-//     }
-    
-//     // In production, we don't want to crash immediately
-//     if (!isProduction) {
-//       process.exit(1);
-//     }
-//   } finally {
-//     if (client) {
-//       client.release();
-//     }
-//   }
-// }
-
-// // Execute connection test on startup (non-blocking)
-// setTimeout(() => {
-//   testConnection();
-// }, 1000);
-
-// // Enhanced query function with error handling
-// export const query = async (text, params) => {
-//   const start = Date.now();
-  
-//   try {
-//     const result = await pool.query(text, params);
-//     const duration = Date.now() - start;
-    
-//     // Log slow queries in development
-//     if (!isProduction && duration > 1000) {
-//       console.warn(`🐌 Slow query (${duration}ms):`, text);
-//     }
-    
-//     return result;
-//   } catch (error) {
-//     console.error('💥 Query error:', {
-//       query: text,
-//       params: params,
-//       error: error.message,
-//       code: error.code
-//     });
-    
-//     // Re-throw with additional context
-//     const enhancedError = new Error(`Database query failed: ${error.message}`);
-//     enhancedError.originalError = error;
-//     enhancedError.query = text;
-//     throw enhancedError;
-//   }
-// };
-
-// // Enhanced getClient function with timeout and retry
-// export const getClient = async () => {
-//   const maxRetries = 3;
-//   let lastError;
-  
-//   for (let attempt = 1; attempt <= maxRetries; attempt++) {
-//     try {
-//       const client = await pool.connect();
-      
-//       // Test the connection
-//       await client.query('SELECT 1');
-      
-//       console.log(`✅ Database client acquired successfully (attempt ${attempt})`);
-//       return client;
-      
-//     } catch (error) {
-//       lastError = error;
-//       console.warn(`⚠️ Failed to get database client (attempt ${attempt}/${maxRetries}):`, error.message);
-      
-//       if (attempt < maxRetries) {
-//         // Wait before retrying (exponential backoff)
-//         await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-//       }
-//     }
-//   }
-  
-//   console.error('💥 All attempts to get database client failed');
-//   throw lastError;
-// };
-
-// // Health check function
-// export const healthCheck = async () => {
-//   try {
-//     const client = await getClient();
-//     await client.query('SELECT 1');
-//     client.release();
-    
-//     return {
-//       status: 'healthy',
-//       timestamp: new Date().toISOString(),
-//       database: 'connected'
-//     };
-//   } catch (error) {
-//     return {
-//       status: 'unhealthy',
-//       timestamp: new Date().toISOString(),
-//       database: 'disconnected',
-//       error: error.message
-//     };
-//   }
-// };
-
-// // Graceful shutdown handler
-// process.on('SIGINT', async () => {
-//   console.log('🛑 Received SIGINT, shutting down database pool gracefully...');
-//   await pool.end();
-//   console.log('✅ Database pool closed');
-//   process.exit(0);
-// });
-
-// process.on('SIGTERM', async () => {
-//   console.log('🛑 Received SIGTERM, shutting down database pool gracefully...');
-//   await pool.end();
-//   console.log('✅ Database pool closed');
-//   process.exit(0);
-// });
-
-// export default pool;
 import pkg from 'pg';
 const { Pool } = pkg;
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Determine environment
+// Environment detection - Railway app connecting to Render DB
 const isProduction = process.env.NODE_ENV === 'production';
-const isRailway = process.env.RAILWAY || isProduction;
+const isRailway = process.env.RAILWAY || process.env.RAILWAY_STATIC_URL || isProduction;
 
-// Enhanced pool configuration for Render
-// config/database.js - Replace your current poolConfig
+console.log('🚄 Environment Detection:', {
+  NODE_ENV: process.env.NODE_ENV,
+  RAILWAY: process.env.RAILWAY,
+  isRailway: isRailway,
+  isProduction: isProduction
+});
 
+// CRITICAL: Enhanced pool configuration for Railway → Render connection
 const poolConfig = {
   connectionString: process.env.DATABASE_URL,
   
-  // Enhanced SSL configuration for Railway
+  // FORCE SSL for Render PostgreSQL from Railway
   ssl: isRailway ? { 
     rejectUnauthorized: false,
     require: true
   } : false,
   
-  // Connection pool settings optimized for Railway
-  max: 10,
+  // Connection pool settings optimized for cross-cloud
+  max: 5, // Reduced for better stability
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000,
-  maxUses: 5000,
+  connectionTimeoutMillis: 15000, // Increased for cross-cloud
+  maxUses: 1000,
   allowExitOnIdle: false,
 };
 
+console.log('🔧 Database Configuration:', {
+  ssl: poolConfig.ssl,
+  max: poolConfig.max,
+  connectionTimeout: poolConfig.connectionTimeoutMillis
+});
+
 const pool = new Pool(poolConfig);
-
-//test connection on startup
-// Test connection on startup
-async function testConnection() {
-  let client;
-  try {
-    client = await pool.connect();
-    const result = await client.query('SELECT version()');
-    console.log('✅ Database connected successfully:', result.rows[0].version);
-    
-    // Test SSL
-    const sslResult = await client.query('SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid()');
-    console.log('🔐 SSL Connection:', sslResult.rows[0] ? 'Enabled' : 'Disabled');
-    
-  } catch (error) {
-    console.error('❌ Database connection failed:', {
-      code: error.code,
-      message: error.message,
-      stack: error.stack
-    });
-    
-    // Specific SSL error handling
-    if (error.code === '28000' || error.message.includes('SSL')) {
-      console.error('🔐 SSL Issue Detected - Trying alternative configuration...');
-    }
-  } finally {
-    if (client) client.release();
-  }
-}
-
-// Call this on startup
-testConnection();
 
 // Track active connections for debugging
 const activeClients = new Set();
+
+// Enhanced connection test specifically for Railway → Render
+async function testRailwayRenderConnection() {
+  let client;
+  try {
+    console.log('🚄 Testing Railway→Render Database Connection...');
+    console.log('📡 Database Host:', process.env.DATABASE_URL?.split('@')[1]?.split('/')[0]);
+    console.log('🔐 SSL Configuration:', pool.options?.ssl);
+    
+    client = await pool.connect();
+    
+    // Test basic connection
+    const versionResult = await client.query('SELECT version()');
+    console.log('✅ Database Version:', versionResult.rows[0].version.split(',')[0]);
+    
+    // Test SSL specifically
+    const sslResult = await client.query(`
+      SELECT 
+        ssl,
+        version,
+        cipher,
+        bits 
+      FROM pg_stat_ssl 
+      WHERE pid = pg_backend_pid()
+    `);
+    
+    if (sslResult.rows.length > 0) {
+      console.log('🔐 SSL Status: ACTIVE', {
+        ssl: sslResult.rows[0].ssl ? 'ENABLED' : 'DISABLED',
+        cipher: sslResult.rows[0].cipher,
+        bits: sslResult.rows[0].bits
+      });
+    } else {
+      console.log('⚠️ SSL Status: No SSL information available');
+    }
+    
+    console.log('🎉 SUCCESS: Railway→Render connection established with SSL!');
+    
+  } catch (error) {
+    console.error('❌ CRITICAL: Railway→Render connection failed:', {
+      code: error.code,
+      message: error.message,
+      hint: 'Make sure SSL is forced for Render PostgreSQL'
+    });
+    
+    // Provide specific guidance based on error
+    if (error.code === '28000' || error.message.includes('SSL')) {
+      console.error('🚨 SSL REQUIRED: Render PostgreSQL mandates SSL connections');
+      console.error('💡 Solution: Force SSL in connection configuration');
+    }
+  } finally {
+    if (client) {
+      client.release();
+      console.log('🔓 Test client released');
+    }
+  }
+}
+
+// Call this on startup with delay to ensure pool is ready
+setTimeout(() => {
+  testRailwayRenderConnection();
+}, 3000);
 
 // Enhanced event listeners
 pool.on('connect', (client) => {
@@ -280,12 +122,11 @@ pool.on('remove', (client) => {
 });
 
 pool.on('error', (err, client) => {
-  console.error('💥 Unexpected error on idle database client:', err);
-  
-  // Don't crash the app on production, just log the error
-  if (!isProduction) {
-    process.exit(-1);
-  }
+  console.error('💥 Unexpected error on idle database client:', {
+    message: err.message,
+    code: err.code,
+    sslRelated: err.message.includes('SSL') ? 'YES' : 'NO'
+  });
 });
 
 // Periodic pool status monitoring
@@ -297,7 +138,7 @@ setInterval(() => {
     active: activeClients.size,
     timestamp: new Date().toISOString()
   });
-}, 30000); // Log every 30 seconds
+}, 30000);
 
 // Enhanced query function with error handling
 export const query = async (text, params) => {
@@ -307,56 +148,60 @@ export const query = async (text, params) => {
     const result = await pool.query(text, params);
     const duration = Date.now() - start;
     
-    // Log slow queries in development
-    if (!isProduction && duration > 1000) {
-      console.warn(`🐌 Slow query (${duration}ms):`, text);
+    // Log slow queries
+    if (duration > 1000) {
+      console.warn(`🐌 Slow query (${duration}ms):`, text.substring(0, 100) + '...');
     }
     
     return result;
   } catch (error) {
     console.error('💥 Query error:', {
-      query: text,
-      params: params,
+      query: text.substring(0, 200),
+      params: params ? '[...]' : 'none',
       error: error.message,
       code: error.code
     });
     
-    // Re-throw with additional context
-    const enhancedError = new Error(`Database query failed: ${error.message}`);
-    enhancedError.originalError = error;
-    enhancedError.query = text;
-    throw enhancedError;
+    throw error;
   }
 };
 
-// Enhanced getClient function with timeout and retry
+// Enhanced getClient function with timeout and retry - CRITICAL FIX
 export const getClient = async () => {
   const maxRetries = 3;
   let lastError;
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
+      console.log(`🔗 Database connection attempt ${attempt}/${maxRetries}...`);
       const client = await pool.connect();
       
-      // Test the connection
-      await client.query('SELECT 1');
+      // Test connection with simple query
+      await client.query('SELECT NOW() as connection_test');
       
-      console.log(`✅ Database client acquired successfully (attempt ${attempt}) - Active: ${activeClients.size}`);
+      console.log(`✅ Database client acquired successfully (attempt ${attempt})`);
       return client;
       
     } catch (error) {
       lastError = error;
-      console.warn(`⚠️ Failed to get database client (attempt ${attempt}/${maxRetries}):`, error.message);
+      console.error(`⚠️ Database connection failed (attempt ${attempt}/${maxRetries}):`, {
+        code: error.code,
+        message: error.message,
+        sslIssue: error.message.includes('SSL') ? 'YES' : 'NO'
+      });
       
       if (attempt < maxRetries) {
-        // Wait before retrying (exponential backoff)
-        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        const delay = 2000 * attempt;
+        console.log(`⏳ Retrying in ${delay/1000} seconds...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
   }
   
-  console.error('💥 All attempts to get database client failed');
-  throw lastError;
+  console.error('💥 All database connection attempts failed');
+  const finalError = new Error(`Database connection failed: ${lastError?.message}`);
+  finalError.originalError = lastError;
+  throw finalError;
 };
 
 // Enhanced health check with connection details
@@ -373,12 +218,20 @@ export const healthCheck = async () => {
       WHERE datname = current_database()
     `);
     
+    // Get SSL info
+    const sslInfo = await client.query(`
+      SELECT ssl, cipher, bits 
+      FROM pg_stat_ssl 
+      WHERE pid = pg_backend_pid()
+    `);
+    
     client.release();
     
     return {
       status: 'healthy',
       timestamp: new Date().toISOString(),
       database: 'connected',
+      ssl: sslInfo.rows[0] || { ssl: false },
       poolStats: {
         total: pool.totalCount,
         idle: pool.idleCount,
