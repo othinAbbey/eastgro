@@ -205,24 +205,26 @@ dotenv.config();
 
 // Determine environment
 const isProduction = process.env.NODE_ENV === 'production';
-const isRender = process.env.RENDER || process.env.NODE_ENV === 'production';
+const isRailway = process.env.RAILWAY || isProduction;
 
 // Enhanced pool configuration for Render
 // config/database.js - Replace your current poolConfig
+
 const poolConfig = {
   connectionString: process.env.DATABASE_URL,
   
-  // Enhanced SSL configuration for Render
-  ssl: {
+  // Enhanced SSL configuration for Railway
+  ssl: isRailway ? { 
     rejectUnauthorized: false,
     require: true
-  },
+  } : false,
   
-  // Connection settings
-  max: 10, // Reduced for Render's limits
+  // Connection pool settings optimized for Railway
+  max: 10,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 10000,
   maxUses: 5000,
+  allowExitOnIdle: false,
 };
 
 const pool = new Pool(poolConfig);
