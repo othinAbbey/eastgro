@@ -10,7 +10,7 @@ import facilityRoutes from './routes/webRoutes/Services Management/facilityRoute
 import shipmentRoutes from './routes/webRoutes/Services Management/shipmentRoutes.js';
 import customerRoutes from './routes/webRoutes/Customer Management/customerRoutes.js';
 import qrCodeRoutes from './routes/webRoutes/SMS and USSD/qrCodeRoutes.js';
-import authRoutes from './routes/webRoutes/authRoutes.js';
+// import authRoutes from './routes/webRoutes/authRoutes.js';
 import celoCropRegisterRoutes from './routes/webRoutes/SMS and USSD/celoCropRegisterRoutes.js';
 import cropRegisterRoutes from './routes/webRoutes/Crop Management/cropRegisterRoutes.js';
 import salesRoutes from './routes/webRoutes/Sales and Purchases/salesRoutes.js';
@@ -77,7 +77,7 @@ app.use('/facility', facilityRoutes);
 app.use('/shipments', shipmentRoutes);
 app.use('/customers', customerRoutes);
 app.use('/qrcodes', qrCodeRoutes);
-app.use('/auth', authRoutes);
+// app.use('/auth', authRoutes);
 app.use('/celoblockchain', celoCropRegisterRoutes);
 app.use('/crops', cropRegisterRoutes,)
 app.use('/sales', salesRoutes)

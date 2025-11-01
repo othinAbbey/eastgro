@@ -1,6 +1,6 @@
 // // AUTO-GENERATED ROUTES
-// const express = require('express');
-// const router = express.Router();
+// import { Router } from 'express';
+// const router = Router();
 
 
 // // Product Routes
@@ -155,4 +155,4 @@
 // router.delete('/serviceprovider/:id', ServiceProviderController.delete);
 
 
-// module.exports = router;
+// export default router;
